@@ -1,15 +1,15 @@
-# CommissionFlow Brand Style Guide (Draft)
+# ARFlow Brand Style Guide
 
 This guide reflects the current UI patterns and visual language used across the marketing pages and app UI.
 
 ## Brand Summary
-- **Positioning:** trustworthy, data-driven, modern, and friendly for SMB finance/sales teams.
-- **Personality:** confident, transparent, helpful, and optimistic about automation.
-- **Core promise:** clarity and control over commissions with AI‑assisted workflows.
+- **Positioning:** Modern, trustworthy, and transparent for B2B companies managing accounts receivable.
+- **Personality:** Professional, clear, efficient, and customer-focused.
+- **Core promise:** Give your customers clarity on every invoice with secure self-service access.
 
 ## Logo
-- **Wordmark:** “CommissionFlow” with a blue→purple gradient text.
-- **Icon mark:** rounded square with a blue→purple→pink gradient and white `DollarSign` icon.
+- **Wordmark:** "ARFlow" with a teal→blue gradient text.
+- **Icon mark:** rounded square with a teal→blue→cyan gradient and white `FileText` or `DollarSign` icon.
 - **Usage:** prefer full wordmark in headers/footers; icon mark for small spaces (nav, app chrome).
 
 ## Color System
@@ -26,10 +26,10 @@ The UI uses Tailwind + shadcn/ui CSS variables defined in `src/app/globals.css`.
 - **Destructive:** `oklch(0.577 0.245 27.325)`
 
 ### Brand Gradients (Tailwind)
-- **Primary gradient:** `from-blue-600 to-purple-600`
-- **Hero gradient:** `from-blue-600 via-purple-600 to-pink-600`
-- **Icon mark:** `from-blue-600 via-purple-600 to-pink-600`
-- **Soft glow blobs:** `bg-blue-500/20`, `bg-purple-500/20` with `blur-3xl`
+- **Primary gradient:** `from-teal-600 to-blue-600`
+- **Hero gradient:** `from-teal-600 via-blue-600 to-cyan-600`
+- **Icon mark:** `from-teal-600 via-blue-600 to-cyan-600`
+- **Soft glow blobs:** `bg-teal-500/20`, `bg-blue-500/10`, `bg-cyan-500/10` with `blur-3xl`
 
 ### Status & Data Colors
 - **Success:** green/emerald (`text-green-600`, `text-emerald-600`)
@@ -60,7 +60,7 @@ The UI uses Tailwind + shadcn/ui CSS variables defined in `src/app/globals.css`.
 These align with the components in `@/components/ui` and usage patterns in the app.
 
 ### Buttons
-- **Primary CTA:** gradient `from-blue-600 to-purple-600`, `hover:opacity-90`, default `Button`.
+- **Primary CTA:** gradient `from-teal-600 to-blue-600`, `hover:opacity-90`, default `Button`.
 - **Secondary:** `variant="outline"` with brand color text for emphasis.
 - **Ghost/Text:** use for tertiary actions; keep contrast with `text-muted-foreground`.
 - **Sizing:** `size="lg"` for hero CTAs, default size inside app.
@@ -81,11 +81,13 @@ These align with the components in `@/components/ui` and usage patterns in the a
 
 ### Cards
 - **Default:** `border-2`, soft gradient background `from-card to-muted/20`.
-- **Hover:** elevate with `shadow-lg` and subtle border color shift.
-- **Stats cards:** bold numbers, gradient text for top KPIs.
+- **Hover:** elevate with `shadow-xl`, subtle border color shift (`border-primary/50`), and translate up (`hover:-translate-y-1`).
+- **Stats cards:** bold numbers, gradient text (`from-teal-600 to-blue-600`) for top KPIs.
+- **Feature cards:** use gradient icon containers with `from-teal-600 to-blue-600` and scale on hover (`group-hover:scale-110`).
 
 ### Badges & Pills
-- **Informational:** soft backgrounds with colored text (blue/amber/emerald).
+- **Informational:** soft backgrounds with colored text (teal/blue/amber/emerald).
+- **Brand pills:** `bg-teal-500/10 border border-teal-500/20` with teal text.
 - **Status:** small rounded pills with `text-xs font-medium`.
 
 ### Alerts & Callouts
@@ -99,14 +101,16 @@ These align with the components in `@/components/ui` and usage patterns in the a
 - **Spacing:** generous padding and clear section boundaries.
 
 ### Navigation
-- **Header:** sticky with `bg-background/80` and `backdrop-blur-sm`.
+- **Header:** sticky with `bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60`.
+- **Logo:** teal→blue→cyan gradient icon with gradient text wordmark.
 - **Sidebar:** `bg-sidebar` tokens, active item with `bg-gradient-to-r from-accent`.
 - **Active states:** use `font-medium` plus subtle gradient or accent fill.
+- **Hover states:** use `hover:text-teal-600` for navigation links.
 
 ### Charts & Data Viz
-- **Palette:** use `--chart-1`..`--chart-5` or blue/purple accents.
+- **Palette:** use `--chart-1`..`--chart-5` or teal/blue accents.
 - **Labels:** `text-muted-foreground`, `text-xs` or `text-sm`.
-- **Highlights:** use bold text + color for top performers or key metrics.
+- **Highlights:** use bold text + teal/blue gradient for top performers or key metrics.
 
 ### Empty States
 - **Structure:** icon, title, short description, single CTA.
@@ -122,19 +126,40 @@ These align with the components in `@/components/ui` and usage patterns in the a
 - **Use sparingly:** motion should signal emphasis, not distract.
 
 ## Voice & Messaging
-- **Tone:** clear, concise, confident; avoid jargon.
-- **Messaging patterns:** “Simple, Transparent”, “AI‑Powered”, “Setup in minutes”.
-- **Proof points:** highlight accuracy, time saved, and reliability.
+- **Tone:** clear, concise, professional; avoid jargon.
+- **Messaging patterns:** "24/7 Customer Access", "50% Fewer AR Calls", "Setup in 5 minutes".
+- **Value proposition:** Self-service portal, transparency, reduced support burden.
+- **Proof points:** highlight time saved, reduced inquiries, and customer satisfaction.
 
-## Do / Don’t
-- **Do:** use blue→purple gradients for hero CTAs and brand accents.
+## Do / Don't
+- **Do:** use teal→blue gradients for hero CTAs and brand accents.
 - **Do:** keep surfaces clean with muted backgrounds and strong contrast.
 - **Do:** emphasize key numbers with bold or gradient text.
-- **Don’t:** introduce new saturated colors outside the established palette.
-- **Don’t:** use heavy drop shadows or dense UI layouts.
+- **Do:** use soft glow effects (`blur-3xl`) with teal/blue/cyan colors at low opacity.
+- **Do:** use hover animations like translate, scale, and shadow transitions.
+- **Don't:** introduce new saturated colors outside the teal-blue-cyan palette.
+- **Don't:** use heavy drop shadows or dense UI layouts.
+- **Don't:** mix the old blue-purple-pink gradients with the new teal-blue-cyan system.
+
+## Key Visual Patterns
+
+### Landing Page
+- **Hero section:** Large headlines with teal→blue→cyan gradient text on key phrases
+- **Background effects:** Animated pulse gradient blobs in teal and blue with heavy blur
+- **Stats bar:** Bold gradient numbers showing "24/7", "50%", "5min" metrics
+- **Feature cards:** Border-2 with hover effects including shadow, translate, and border color shift
+- **Pricing cards:** Highlighted tier with teal-600 border and gradient badge
+
+### App Dashboard
+- **Header:** Sticky with backdrop blur, teal-blue gradient logo and CTA button
+- **Organization badge:** Muted background with border, building icon
+- **Search bar:** Full-width with keyboard shortcut indicator
+- **Cards:** Consistent 2px borders with gradient backgrounds and hover elevation
+- **Empty states:** Icon, title, description, single CTA pattern
 
 ## References
 - Primary styles: `src/app/globals.css`
-- Marketing hero patterns: `src/app/page.tsx`
-- Auth/onboarding styling: `src/app/sign-in/[[...sign-in]]/page.tsx`, `src/app/sign-up/[[...sign-up]]/page.tsx`, `src/app/onboarding/page.tsx`
+- Landing page: `src/app/page.tsx`
+- Dashboard header: `src/components/navigation/enhanced-header.tsx`
+- Dashboard layout: `src/app/dashboard/layout.tsx`
 - UI system config: `components.json`
