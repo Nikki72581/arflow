@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" fill="none">
+  <rect width="200" height="60" fill="white"/>
+  <text x="100" y="30" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#00A94F" text-anchor="middle">
+    Sage Intacct
+  </text>
+  <path d="M20 20 L30 30 L20 40 Z" fill="#00A94F"/>
+  <path d="M180 20 L170 30 L180 40 Z" fill="#00A94F"/>
+</svg>
