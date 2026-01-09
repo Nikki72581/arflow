@@ -64,7 +64,7 @@ import type { AuditAction, EntityType } from '@/lib/audit-log'
 
 interface AuditLog {
   id: string
-  createdAt: Date
+  createdAt: Date | string
   userId: string | null
   userName: string | null
   userEmail: string | null
@@ -72,42 +72,56 @@ interface AuditLog {
   entityType: string
   entityId: string | null
   description: string
-  metadata: any
+  metadata: Record<string, unknown> | null
   ipAddress: string | null
   userAgent: string | null
 }
 
 const ACTION_LABELS: Record<string, string> = {
-  commission_created: 'Commission Created',
-  commission_approved: 'Commission Approved',
-  commission_paid: 'Commission Paid',
-  commission_rejected: 'Commission Rejected',
-  bulk_payout_processed: 'Bulk Payout Processed',
-  sale_created: 'Sale Created',
-  sale_updated: 'Sale Updated',
-  sale_deleted: 'Sale Deleted',
-  plan_created: 'Plan Created',
-  plan_updated: 'Plan Updated',
-  plan_activated: 'Plan Activated',
-  plan_deactivated: 'Plan Deactivated',
+  invoice_created: 'Invoice Created',
+  invoice_updated: 'Invoice Updated',
+  invoice_voided: 'Invoice Voided',
+  payment_created: 'Payment Created',
+  payment_applied: 'Payment Applied',
+  payment_voided: 'Payment Voided',
+  customer_created: 'Customer Created',
+  customer_updated: 'Customer Updated',
+  customer_status_changed: 'Customer Status Changed',
   user_invited: 'User Invited',
   user_role_changed: 'Role Changed',
   user_removed: 'User Removed',
   settings_updated: 'Settings Updated',
   integration_sync: 'Integration Sync',
   integration_sync_reverted: 'Integration Sync Reverted',
+  // Legacy action labels for older data
+  commission_created: 'Commission Created (Legacy)',
+  commission_approved: 'Commission Approved (Legacy)',
+  commission_paid: 'Commission Paid (Legacy)',
+  commission_rejected: 'Commission Rejected (Legacy)',
+  bulk_payout_processed: 'Bulk Payout Processed (Legacy)',
+  sale_created: 'Sale Created (Legacy)',
+  sale_updated: 'Sale Updated (Legacy)',
+  sale_deleted: 'Sale Deleted (Legacy)',
+  plan_created: 'Plan Created (Legacy)',
+  plan_updated: 'Plan Updated (Legacy)',
+  plan_activated: 'Plan Activated (Legacy)',
+  plan_deactivated: 'Plan Deactivated (Legacy)',
 }
 
 const ENTITY_TYPE_LABELS: Record<string, string> = {
-  commission: 'Commission',
-  sale: 'Sale',
-  plan: 'Plan',
+  invoice: 'Invoice',
+  payment: 'Payment',
+  customer: 'Customer',
   user: 'User',
-  client: 'Client',
-  project: 'Project',
   organization: 'Organization',
   settings: 'Settings',
   integration: 'Integration',
+  // Legacy entity labels for older data
+  commission: 'Commission (Legacy)',
+  sale: 'Sale (Legacy)',
+  plan: 'Plan (Legacy)',
+  client: 'Client (Legacy)',
+  project: 'Project (Legacy)',
 }
 
 export default function AuditLogsClient() {
@@ -128,7 +142,7 @@ export default function AuditLogsClient() {
   const [endDate, setEndDate] = useState<string>('')
 
   // Users for filter dropdown
-  const [users, setUsers] = useState<Array<{ userId: string; userName: string | null; userEmail: string | null }>>([])
+  const [users, setUsers] = useState<Array<{ id: string; name: string; email: string | null }>>([])
 
   // Detail modal
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null)
@@ -170,9 +184,9 @@ export default function AuditLogsClient() {
       const result = await getAuditLogsWithFilters(filters)
 
       if (result.success && result.data) {
-        setLogs(result.data.logs)
-        setTotal(result.data.total)
-        setTotalPages('totalPages' in result.data ? result.data.totalPages : 1)
+        setLogs(result.data)
+        setTotal(result.pagination?.totalCount ?? result.data.length)
+        setTotalPages(result.pagination?.totalPages ?? 1)
       } else {
         toast({
           title: 'Error',
@@ -286,7 +300,7 @@ export default function AuditLogsClient() {
 
     const result = await getAuditLogsWithFilters(filters)
     if (result.success && result.data) {
-      setPurgeCount(result.data.total)
+      setPurgeCount(result.pagination?.totalCount ?? result.data.length)
       setShowPurgeConfirm(true)
     }
   }
@@ -435,8 +449,8 @@ export default function AuditLogsClient() {
                 <SelectContent>
                   <SelectItem value="all">All users</SelectItem>
                   {users.map((user) => (
-                    <SelectItem key={user.userId} value={user.userId}>
-                      {user.userName || user.userEmail || 'Unknown User'}
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.name || user.email || 'Unknown User'}
                     </SelectItem>
                   ))}
                 </SelectContent>

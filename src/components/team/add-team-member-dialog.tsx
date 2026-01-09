@@ -37,16 +37,12 @@ export function AddTeamMemberDialog() {
     email: string
     firstName: string
     lastName: string
-    employeeId: string
-    salespersonId: string
-    role: 'ADMIN' | 'SALESPERSON'
+    role: 'ADMIN' | 'CUSTOMER'
   }>>([{
     email: '',
     firstName: '',
     lastName: '',
-    employeeId: '',
-    salespersonId: '',
-    role: 'SALESPERSON'
+    role: 'CUSTOMER'
   }])
 
   const addInviteEmailField = () => {
@@ -68,9 +64,7 @@ export function AddTeamMemberDialog() {
       email: '',
       firstName: '',
       lastName: '',
-      employeeId: '',
-      salespersonId: '',
-      role: 'SALESPERSON'
+      role: 'CUSTOMER'
     }])
   }
 
@@ -127,8 +121,6 @@ export function AddTeamMemberDialog() {
           email: u.email.trim(),
           firstName: u.firstName.trim() || undefined,
           lastName: u.lastName.trim() || undefined,
-          employeeId: u.employeeId.trim() || undefined,
-          salespersonId: u.salespersonId.trim() || undefined,
           role: u.role,
         }))
       )
@@ -143,9 +135,7 @@ export function AddTeamMemberDialog() {
         email: '',
         firstName: '',
         lastName: '',
-        employeeId: '',
-        salespersonId: '',
-        role: 'SALESPERSON'
+        role: 'CUSTOMER'
       }])
       setOpen(false)
     } catch (error) {
@@ -299,28 +289,6 @@ export function AddTeamMemberDialog() {
                       />
                     </div>
 
-                    <div>
-                      <Label htmlFor={`placeholder-employeeId-${index}`}>Employee ID</Label>
-                      <Input
-                        id={`placeholder-employeeId-${index}`}
-                        placeholder="EMP001"
-                        value={user.employeeId}
-                        onChange={(e) => updatePlaceholderUser(index, 'employeeId', e.target.value)}
-                        disabled={loading}
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor={`placeholder-salespersonId-${index}`}>Salesperson ID</Label>
-                      <Input
-                        id={`placeholder-salespersonId-${index}`}
-                        placeholder="SP001"
-                        value={user.salespersonId}
-                        onChange={(e) => updatePlaceholderUser(index, 'salespersonId', e.target.value)}
-                        disabled={loading}
-                      />
-                    </div>
-
                     <div className="col-span-2">
                       <Label htmlFor={`placeholder-role-${index}`}>Role</Label>
                       <Select
@@ -332,7 +300,7 @@ export function AddTeamMemberDialog() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="SALESPERSON">Salesperson</SelectItem>
+                          <SelectItem value="CUSTOMER">Customer</SelectItem>
                           <SelectItem value="ADMIN">Admin</SelectItem>
                         </SelectContent>
                       </Select>

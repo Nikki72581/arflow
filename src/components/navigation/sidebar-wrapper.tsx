@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 import { EnhancedSidebar } from './enhanced-sidebar'
 
 interface SidebarWrapperProps {
-  userRole: 'ADMIN' | 'SALESPERSON'
+  userRole: 'ADMIN' | 'CUSTOMER'
   pendingCount: number
   userName: string
   organizationName: string

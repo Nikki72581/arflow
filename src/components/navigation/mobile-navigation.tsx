@@ -22,7 +22,7 @@ interface MobileNavItem {
 }
 
 interface MobileBottomNavProps {
-  userRole?: 'ADMIN' | 'SALESPERSON'
+  userRole?: 'ADMIN' | 'CUSTOMER'
   pendingCount?: number
 }
 
@@ -134,7 +134,7 @@ export function MobileBottomNav({
  * Alternative to bottom nav if you prefer top menu
  */
 interface MobileHeaderProps {
-  userRole?: 'ADMIN' | 'SALESPERSON'
+  userRole?: 'ADMIN' | 'CUSTOMER'
   pendingCount?: number
 }
 

@@ -180,6 +180,7 @@ export async function exportAuditLogsToCsv(filters: AuditLogFilters) {
     const csvData = logs.map(log => ({
       timestamp: log.createdAt.toISOString(),
       user: log.userName || log.userEmail || 'System',
+      email: log.userEmail || '',
       action: log.action,
       entityType: log.entityType,
       entityId: log.entityId || '',

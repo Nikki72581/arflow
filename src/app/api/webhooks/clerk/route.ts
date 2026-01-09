@@ -78,14 +78,14 @@ export async function POST(req: Request) {
           })
         }
       } else {
-        // Create new user with SALESPERSON role by default
+        // Create new user with CUSTOMER role by default
         await db.user.create({
           data: {
             clerkId: public_user_data.user_id,
             email: public_user_data.identifier || '',
             firstName: public_user_data.first_name || null,
             lastName: public_user_data.last_name || null,
-            role: 'SALESPERSON',
+            role: 'CUSTOMER',
             organizationId: org.id,
           },
         })

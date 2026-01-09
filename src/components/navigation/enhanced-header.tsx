@@ -41,7 +41,7 @@ import { cn } from '@/lib/utils'
 interface EnhancedHeaderProps {
   userName?: string
   userEmail?: string
-  userRole?: 'ADMIN' | 'SALESPERSON'
+  userRole?: 'ADMIN' | 'CUSTOMER'
   organizationName?: string
   organizationSlug?: string
   notificationCount?: number
@@ -179,7 +179,7 @@ export function EnhancedHeader({
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Search sales, clients, commissions... (Press / to focus)"
+              placeholder="Search clients, invoices, payments... (Press / to focus)"
               className={cn(
                 'w-full pl-9 pr-4',
                 searchFocused && 'ring-2 ring-primary'
@@ -305,17 +305,17 @@ export function EnhancedHeader({
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium">{userName}</p>
                   <p className="text-xs text-muted-foreground">{userEmail}</p>
-                  <Badge variant="outline" className="w-fit">
-                    {userRole}
-                  </Badge>
-                </div>
+              <Badge variant="outline" className="w-fit">
+                    {userRole === 'CUSTOMER' ? 'Customer' : userRole}
+              </Badge>
+            </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {userRole === 'SALESPERSON' && (
+              {userRole === 'CUSTOMER' && (
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard/my-commissions">
+                  <Link href="/dashboard/portal/invoices">
                     <DollarSign className="mr-2 h-4 w-4" />
-                    <span>My Commissions</span>
+                    <span>My Invoices</span>
                   </Link>
                 </DropdownMenuItem>
               )}

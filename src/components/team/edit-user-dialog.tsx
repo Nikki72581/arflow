@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Dialog,
@@ -14,6 +13,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { updateUserFields } from '@/app/actions/users'
 import { toast } from 'sonner'
 
@@ -23,23 +29,20 @@ interface EditUserDialogProps {
     firstName: string | null
     lastName: string | null
     email: string
-    employeeId?: string | null
-    salespersonId?: string | null
+    role: 'ADMIN' | 'CUSTOMER'
   }
 }
 
 export function EditUserDialog({ user }: EditUserDialogProps) {
   const [open, setOpen] = useState(false)
-  const [employeeId, setEmployeeId] = useState(user.employeeId || '')
-  const [salespersonId, setSalespersonId] = useState(user.salespersonId || '')
+  const [role, setRole] = useState<'ADMIN' | 'CUSTOMER'>(user.role)
   const [loading, setLoading] = useState(false)
 
   const handleSave = async () => {
     setLoading(true)
     try {
       const result = await updateUserFields(user.id, {
-        employeeId: employeeId.trim() || undefined,
-        salespersonId: salespersonId.trim() || undefined,
+        role,
       })
 
       if (!result.success) {
@@ -70,34 +73,23 @@ export function EditUserDialog({ user }: EditUserDialogProps) {
         <DialogHeader>
           <DialogTitle>Edit Team Member</DialogTitle>
           <DialogDescription>
-            Update external system IDs for {fullName}
+            Update role access for {fullName}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="employeeId">Employee ID</Label>
-            <Input
-              id="employeeId"
-              placeholder="Employee ID"
-              value={employeeId}
-              onChange={(e) => setEmployeeId(e.target.value)}
-              disabled={loading}
-            />
+            <Label htmlFor="role">Role</Label>
+            <Select value={role} onValueChange={(value: 'ADMIN' | 'CUSTOMER') => setRole(value)}>
+              <SelectTrigger id="role">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ADMIN">Admin</SelectItem>
+                <SelectItem value="CUSTOMER">Customer</SelectItem>
+              </SelectContent>
+            </Select>
             <p className="text-xs text-muted-foreground">
-              Employee ID from your external HR or payroll system
-            </p>
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="salespersonId">Salesperson ID</Label>
-            <Input
-              id="salespersonId"
-              placeholder="Salesperson ID"
-              value={salespersonId}
-              onChange={(e) => setSalespersonId(e.target.value)}
-              disabled={loading}
-            />
-            <p className="text-xs text-muted-foreground">
-              Salesperson ID from your external CRM or sales system
+              Admins have full access. Customers are limited to the portal.
             </p>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { Users, Search, Award, DollarSign, TrendingUp, Pencil } from 'lucide-react'
+import { Users, Search, Award, DollarSign, TrendingUp } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import {
   Table,
@@ -29,20 +29,20 @@ export const metadata = {
 }
 
 async function getTeamStats(organizationId: string) {
-  const [totalUsers, salespeople, admins, totalCommissions] = await Promise.all([
+  const [totalUsers, customers, admins, totalPayments] = await Promise.all([
     db.user.count({
       where: { organizationId },
     }),
     db.user.count({
-      where: { organizationId, role: 'SALESPERSON' },
+      where: { organizationId, role: 'CUSTOMER' },
     }),
     db.user.count({
       where: { organizationId, role: 'ADMIN' },
     }),
-    db.commissionCalculation.aggregate({
+    db.customerPayment.aggregate({
       where: {
         organizationId,
-        status: { in: ['APPROVED', 'PAID'] },
+        status: { in: ['APPLIED'] },
       },
       _sum: { amount: true },
     }),
@@ -50,32 +50,9 @@ async function getTeamStats(organizationId: string) {
 
   return {
     totalUsers,
-    salespeople,
+    customers,
     admins,
-    totalCommissions: totalCommissions._sum.amount || 0,
-  }
-}
-
-async function getUserCommissionStats(userId: string) {
-  const [totalEarned, pendingCount] = await Promise.all([
-    db.commissionCalculation.aggregate({
-      where: {
-        userId,
-        status: { in: ['APPROVED', 'PAID'] },
-      },
-      _sum: { amount: true },
-    }),
-    db.commissionCalculation.count({
-      where: {
-        userId,
-        status: 'PENDING',
-      },
-    }),
-  ])
-
-  return {
-    totalEarned: totalEarned._sum.amount || 0,
-    pendingCount,
+    totalPayments: totalPayments._sum.amount || 0,
   }
 }
 
@@ -100,8 +77,7 @@ async function TeamTable({ searchQuery, isAdmin }: { searchQuery?: string; isAdm
         user.email.toLowerCase().includes(query) ||
         user.firstName?.toLowerCase().includes(query) ||
         user.lastName?.toLowerCase().includes(query) ||
-        user.employeeId?.toLowerCase().includes(query) ||
-        user.salespersonId?.toLowerCase().includes(query)
+        user.customerId?.toLowerCase().includes(query)
     )
   }
 
@@ -125,54 +101,6 @@ async function TeamTable({ searchQuery, isAdmin }: { searchQuery?: string; isAdm
     )
   }
 
-  // Fetch commission stats for all users in a single query (fixes N+1 problem)
-  const userIds = users.map(u => u.id);
-  const [commissionStats, pendingCounts] = await Promise.all([
-    db.commissionCalculation.groupBy({
-      by: ['userId'],
-      where: {
-        userId: { in: userIds },
-        status: { in: ['APPROVED', 'PAID'] },
-      },
-      _sum: {
-        amount: true,
-      },
-    }),
-    db.commissionCalculation.groupBy({
-      by: ['userId'],
-      where: {
-        userId: { in: userIds },
-        status: 'PENDING',
-      },
-      _count: {
-        _all: true,
-      },
-    }),
-  ]);
-
-  // Create lookup maps for O(1) access
-  const statsMap = new Map(
-    commissionStats
-      .filter(s => s._sum.amount !== null)
-      .map(s => [
-        s.userId,
-        {
-          totalEarned: s._sum.amount || 0,
-        },
-      ])
-  );
-
-  const pendingMap = new Map(
-    pendingCounts.map(p => [p.userId, p._count._all])
-  );
-
-  // Combine user data with stats
-  const usersWithStats = users.map(user => ({
-    ...user,
-    totalEarned: statsMap.get(user.id)?.totalEarned || 0,
-    pendingCount: pendingMap.get(user.id) || 0,
-  }));
-
   return (
     <div className="rounded-lg border border-border bg-gradient-to-br from-card to-muted/20 shadow-sm">
       <Table>
@@ -181,17 +109,14 @@ async function TeamTable({ searchQuery, isAdmin }: { searchQuery?: string; isAdm
             <TableHead className="font-semibold">Name</TableHead>
             <TableHead className="font-semibold">Email</TableHead>
             <TableHead className="font-semibold">Status</TableHead>
-            <TableHead className="font-semibold">Employee ID</TableHead>
-            <TableHead className="font-semibold">Salesperson ID</TableHead>
+            <TableHead className="font-semibold">Customer ID</TableHead>
             <TableHead className="font-semibold">Role</TableHead>
-            <TableHead className="font-semibold">Total Earned</TableHead>
-            <TableHead className="font-semibold">Pending</TableHead>
             <TableHead className="font-semibold">Joined</TableHead>
             {isAdmin && <TableHead className="font-semibold">Actions</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {usersWithStats.map((user) => {
+          {users.map((user) => {
             const fullName = [user.firstName, user.lastName]
               .filter(Boolean)
               .join(' ') || 'Unnamed User'
@@ -219,10 +144,7 @@ async function TeamTable({ searchQuery, isAdmin }: { searchQuery?: string; isAdm
                   )}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {user.employeeId || '—'}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {user.salespersonId || '—'}
+                  {user.customerId || '—'}
                 </TableCell>
                 <TableCell>
                   <Badge
@@ -231,19 +153,6 @@ async function TeamTable({ searchQuery, isAdmin }: { searchQuery?: string; isAdm
                   >
                     {user.role}
                   </Badge>
-                </TableCell>
-                <TableCell className="font-semibold text-emerald-700 dark:text-emerald-400">
-                  ${user.totalEarned.toLocaleString('en-US', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                  })}
-                </TableCell>
-                <TableCell>
-                  {user.pendingCount > 0 ? (
-                    <Badge variant="warning" className="font-semibold">{user.pendingCount}</Badge>
-                  ) : (
-                    <span className="text-muted-foreground"></span>
-                  )}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {formatDate(user.createdAt)}
@@ -296,10 +205,10 @@ export default async function TeamPage({
       description: 'Active users',
     },
     {
-      title: 'Salespeople',
-      value: stats.salespeople.toString(),
+      title: 'Customers',
+      value: stats.customers.toString(),
       icon: TrendingUp,
-      description: 'Sales team members',
+      description: 'Customer portal users',
     },
     {
       title: 'Admins',
@@ -308,13 +217,13 @@ export default async function TeamPage({
       description: 'Admin users',
     },
     {
-      title: 'Total Commissions',
-      value: `$${stats.totalCommissions.toLocaleString('en-US', {
+      title: 'Total Payments',
+      value: `$${stats.totalPayments.toLocaleString('en-US', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
       })}`,
       icon: DollarSign,
-      description: 'All-time earnings',
+      description: 'Payments collected',
     },
   ]
 
