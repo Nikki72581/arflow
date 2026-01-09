@@ -33,7 +33,7 @@ const DEFAULT_DISPLAY_NAMES: Record<DocumentType, string> = {
   DEBIT_MEMO: "Debit Memo",
 };
 
-const MAIN_DOCUMENT_TYPES = [
+const MAIN_DOCUMENT_TYPES: DocumentType[] = [
   DocumentType.INVOICE,
   DocumentType.QUOTE,
   DocumentType.ORDER,
