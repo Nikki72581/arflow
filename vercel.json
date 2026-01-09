@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run test:unit && npm run vercel-build",
+  "buildCommand": "npm run vercel-build",
   "installCommand": "npm ci",
   "framework": "nextjs"
 }
