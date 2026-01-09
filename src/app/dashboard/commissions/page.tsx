@@ -8,7 +8,7 @@ import { CommissionsTableClient } from '@/components/commissions/commissions-tab
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Commissions | CommissionFlow',
+  title: 'Commissions | ARFlow',
   description: 'Review and approve commission calculations',
 }
 

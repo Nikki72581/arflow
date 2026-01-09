@@ -7,7 +7,7 @@ import { requireAdmin } from '@/lib/auth'
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Pending Approvals | CommissionFlow',
+  title: 'Pending Approvals | ARFlow',
   description: 'Approve pending commission calculations',
 }
 

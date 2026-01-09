@@ -9,7 +9,7 @@ import { Receipt } from 'lucide-react'
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Payout History | CommissionFlow',
+  title: 'Payout History | ARFlow',
   description: 'View all commission payout records',
 }
 

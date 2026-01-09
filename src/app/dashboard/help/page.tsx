@@ -34,8 +34,8 @@ import {
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Help & Support | CommissionFlow',
-  description: 'Get started with CommissionFlow - Step-by-step setup guide',
+  title: 'Help & Support | ARFlow',
+  description: 'Get started with ARFlow - Step-by-step setup guide',
 }
 
 interface SetupStep {
@@ -221,7 +221,7 @@ export default async function HelpPage() {
           Help & Support
         </h1>
         <p className="text-lg text-muted-foreground">
-          Welcome to CommissionFlow! Follow these steps to set up your demo environment and explore the platform.
+          Welcome to ARFlow! Follow these steps to set up your demo environment and explore the platform.
         </p>
       </div>
 
@@ -334,7 +334,7 @@ export default async function HelpPage() {
             Frequently Asked Questions
           </CardTitle>
           <CardDescription>
-            Common questions about setting up and using CommissionFlow
+            Common questions about setting up and using ARFlow
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -422,7 +422,7 @@ export default async function HelpPage() {
             Additional Resources
           </CardTitle>
           <CardDescription>
-            More ways to get help and learn about CommissionFlow
+            More ways to get help and learn about ARFlow
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -448,7 +448,7 @@ export default async function HelpPage() {
             </Button>
 
             <Button variant="outline" className="justify-start gap-2 h-auto py-3" asChild>
-              <a href="mailto:support@commissionflow.com">
+              <a href="mailto:support@arflow.app">
                 <ExternalLink className="h-4 w-4" />
                 <div className="text-left">
                   <div className="font-semibold">Contact Support</div>

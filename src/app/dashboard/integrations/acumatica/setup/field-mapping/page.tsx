@@ -242,7 +242,7 @@ export default function FieldMappingPage() {
           Map Acumatica Fields
         </h1>
         <p className="text-muted-foreground mt-2">
-          Step 3 of 7: Connect Acumatica fields to CommissionFlow
+          Step 3 of 7: Connect Acumatica fields to ARFlow
         </p>
       </div>
 
@@ -358,7 +358,7 @@ export default function FieldMappingPage() {
           <div className="space-y-3">
             <FieldSelector
               label="Salesperson Identifier"
-              description="Links the sale to a CommissionFlow user"
+              description="Links the sale to a ARFlow user"
               required
               value={salespersonField}
               onChange={setSalespersonField}
@@ -409,7 +409,7 @@ export default function FieldMappingPage() {
           {/* Customer ID */}
           <FieldSelector
             label="Customer Identifier"
-            description="Links the sale to a CommissionFlow client"
+            description="Links the sale to a ARFlow client"
             required
             value={customerIdField}
             onChange={setCustomerIdField}
@@ -439,7 +439,7 @@ export default function FieldMappingPage() {
 
           <FieldSelector
             label="Project"
-            description="Link sales to CommissionFlow projects"
+            description="Link sales to ARFlow projects"
             value={projectField}
             onChange={setProjectField}
             fields={fieldsByType.string}

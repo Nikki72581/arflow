@@ -66,7 +66,7 @@ export default function OnboardingPage() {
 
       <Card className="w-full max-w-md border-2 shadow-xl">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Welcome to CommissionFlow!</CardTitle>
+          <CardTitle className="text-2xl">Welcome to ARFlow!</CardTitle>
           <CardDescription className="text-base">
             Let's set up your organization to get started.
           </CardDescription>

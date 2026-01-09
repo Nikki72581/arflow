@@ -18,7 +18,7 @@ import { formatDate } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 export const metadata = {
-  title: 'Product Categories | CommissionFlow',
+  title: 'Product Categories | ARFlow',
   description: 'Manage product categories for commission calculations',
 }
 

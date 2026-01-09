@@ -18,7 +18,7 @@ import { formatDate } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 export const metadata = {
-  title: 'Territories | CommissionFlow',
+  title: 'Territories | ARFlow',
   description: 'Manage sales territories for commission calculations',
 }
 

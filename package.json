@@ -1,6 +1,7 @@
 {
   "name": "arflow",
   "version": "0.1.0",
+  "description": "B2B Accounts Receivable portal - Give your customers clarity on every invoice",
   "private": true,
   "prisma": {
     "seed": "tsx prisma/seed.ts"

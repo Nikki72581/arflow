@@ -11,7 +11,7 @@ import { DollarSign, History } from 'lucide-react'
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Bulk Payouts | CommissionFlow',
+  title: 'Bulk Payouts | ARFlow',
   description: 'Process multiple commission payments at once',
 }
 

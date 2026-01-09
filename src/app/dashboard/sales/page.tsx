@@ -14,7 +14,7 @@ import { SalesTableClient } from '@/components/sales/sales-table-client'
 import type { SalesTransactionWithRelations } from '@/lib/types'
 export const dynamic = 'force-dynamic'
 export const metadata = {
-  title: 'Sales | CommissionFlow',
+  title: 'Sales | ARFlow',
   description: 'Manage your sales transactions',
 }
 

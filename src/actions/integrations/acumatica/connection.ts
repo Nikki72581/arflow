@@ -317,8 +317,6 @@ export async function saveAcumaticaConnection(
         encryptedCredentials,
         status: 'ACTIVE',
         lastConnectionTest: new Date(),
-        // Set default date range (last 30 days to now)
-        invoiceStartDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
       },
       update: {
         instanceUrl: input.instanceUrl.replace(/\/$/, ''),

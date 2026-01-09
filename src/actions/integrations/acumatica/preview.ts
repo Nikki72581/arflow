@@ -38,7 +38,7 @@ export async function previewAcumaticaData(
     const integration = await prisma.acumaticaIntegration.findUnique({
       where: { id: integrationId },
       include: {
-        salespersonMappings: true,
+        customerMappings: true,
       },
     });
 
@@ -111,8 +111,8 @@ export async function previewAcumaticaData(
       // Perform validation
       const validation = await validatePreviewData(
         extractedRecords,
-        integration.salespersonMappings,
-        integration.unmappedSalespersonAction
+        integration.customerMappings,
+        integration.unmappedCustomerAction
       );
 
       return {
@@ -134,7 +134,7 @@ export async function previewAcumaticaData(
  */
 async function validatePreviewData(
   records: any[],
-  salespersonMappings: any[],
+  customerMappings: any[],
   unmappedAction: string
 ): Promise<PreviewValidation> {
   const validation: PreviewValidation = {
@@ -146,16 +146,16 @@ async function validatePreviewData(
     errors: [],
   };
 
-  // Build salesperson mapping lookup
-  const salespersonMap = new Map<string, boolean>();
-  for (const mapping of salespersonMappings) {
+  // Build customer mapping lookup
+  const customerMap = new Map<string, boolean>();
+  for (const mapping of customerMappings) {
     if (mapping.status !== "IGNORED") {
-      salespersonMap.set(mapping.acumaticaSalespersonId, !!mapping.userId);
+      customerMap.set(mapping.acumaticaCustomerId, !!mapping.customerId);
     }
   }
 
   // Track issues
-  const unmappedSalespersonCounts = new Map<string, number>();
+  const unmappedCustomerCounts = new Map<string, number>();
   const missingFieldCounts = new Map<string, number>();
 
   for (const record of records) {
@@ -180,20 +180,14 @@ async function validatePreviewData(
     if (!record.customerId) {
       missingFieldCounts.set("customerId", (missingFieldCounts.get("customerId") || 0) + 1);
       hasIssue = true;
-    }
-
-    // Check salesperson mapping
-    if (!record.salespersonId) {
-      missingFieldCounts.set("salesperson", (missingFieldCounts.get("salesperson") || 0) + 1);
-      hasIssue = true;
     } else {
-      const isMapped = salespersonMap.get(record.salespersonId);
+      const isMapped = customerMap.get(record.customerId);
 
       if (isMapped === false || isMapped === undefined) {
-        // Salesperson exists in Acumatica but not mapped in CommissionFlow
-        unmappedSalespersonCounts.set(
-          record.salespersonId,
-          (unmappedSalespersonCounts.get(record.salespersonId) || 0) + 1
+        // Customer exists in Acumatica but not mapped in ARFlow
+        unmappedCustomerCounts.set(
+          record.customerId,
+          (unmappedCustomerCounts.get(record.customerId) || 0) + 1
         );
 
         if (unmappedAction === "SKIP") {
@@ -208,9 +202,9 @@ async function validatePreviewData(
   }
 
   // Populate validation results
-  validation.unmappedSalespeople = Array.from(unmappedSalespersonCounts.entries()).map(
-    ([salespersonId, count]) => ({
-      salespersonId,
+  validation.unmappedSalespeople = Array.from(unmappedCustomerCounts.entries()).map(
+    ([customerId, count]) => ({
+      salespersonId: customerId,
       count,
     })
   );
@@ -226,11 +220,11 @@ async function validatePreviewData(
   if (validation.unmappedSalespeople.length > 0) {
     if (unmappedAction === "SKIP") {
       validation.warnings.push(
-        `${validation.totalRecords - validation.readyToImport} records will be skipped due to unmapped salespeople`
+        `${validation.totalRecords - validation.readyToImport} records will be skipped due to unmapped customers`
       );
     } else {
       validation.warnings.push(
-        `${validation.unmappedSalespeople.reduce((sum, s) => sum + s.count, 0)} records have unmapped salespeople and will be assigned to the default user`
+        `${validation.unmappedSalespeople.reduce((sum, s) => sum + s.count, 0)} records have unmapped customers and will be assigned to default customer`
       );
     }
   }

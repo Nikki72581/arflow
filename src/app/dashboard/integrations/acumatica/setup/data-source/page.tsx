@@ -218,7 +218,7 @@ export default function DataSourceSelectionPage() {
             <CardTitle>Generic Inquiry (OData)</CardTitle>
           </div>
           <CardDescription>
-            CommissionFlow uses Generic Inquiries to retrieve invoice data from Acumatica.
+            ARFlow uses Generic Inquiries to retrieve invoice data from Acumatica.
             This provides maximum flexibility to match your specific Acumatica configuration.
           </CardDescription>
         </CardHeader>

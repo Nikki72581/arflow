@@ -21,7 +21,7 @@ const ThemeProviderContext = createContext<ThemeProviderState | undefined>(undef
 export function ThemeProvider({
   children,
   defaultTheme = 'system',
-  storageKey = 'commissionflow-theme',
+  storageKey = 'arflow-theme',
   ...props
 }: ThemeProviderProps) {
   const [theme, setThemeState] = useState<Theme>(defaultTheme)

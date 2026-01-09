@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 
 export const dynamic = 'force-dynamic'
 export const metadata = {
-  title: 'Performance Reports | CommissionFlow',
+  title: 'Performance Reports | ARFlow',
   description: 'Detailed salesperson performance metrics',
 }
 

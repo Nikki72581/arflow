@@ -412,7 +412,7 @@ export default function SettingsPage() {
             <CardTitle>Appearance</CardTitle>
           </div>
           <CardDescription>
-            Customize how CommissionFlow looks on your device
+            Customize how ARFlow looks on your device
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

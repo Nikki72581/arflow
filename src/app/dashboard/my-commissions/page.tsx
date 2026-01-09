@@ -3,7 +3,7 @@ import MyCommissionsClient from './client-page'
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'My Commissions | CommissionFlow',
+  title: 'My Commissions | ARFlow',
   description: 'View your personal commission earnings and sales performance',
 }
 

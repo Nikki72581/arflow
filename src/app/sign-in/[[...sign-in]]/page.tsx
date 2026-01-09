@@ -17,7 +17,7 @@ export default function SignInPage() {
         <div className="h-10 w-10 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 rounded-lg flex items-center justify-center">
           <DollarSign className="h-6 w-6 text-white" />
         </div>
-        <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">CommissionFlow</span>
+        <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">ARFlow</span>
       </Link>
 
       <SignIn />

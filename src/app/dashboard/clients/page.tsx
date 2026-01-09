@@ -8,7 +8,7 @@ import { ClientFormDialog } from '@/components/clients/client-form-dialog'
 import { ClientsTableWrapper } from '@/components/clients/clients-table-wrapper'
 export const dynamic = 'force-dynamic'
 export const metadata = {
-  title: 'Clients | CommissionFlow',
+  title: 'Clients | ARFlow',
   description: 'Manage your clients',
 }
 

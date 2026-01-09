@@ -1,7 +1,7 @@
 import { DashboardServer } from '@/components/dashboard/dashboard-server'
 
 export const metadata = {
-  title: 'Dashboard | CommissionFlow',
+  title: 'Dashboard | ARFlow',
   description: 'Sales and commission analytics dashboard',
 }
 

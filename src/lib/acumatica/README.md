@@ -1,6 +1,6 @@
 # Acumatica Integration
 
-This directory contains the integration code for connecting CommissionFlow to Acumatica ERP.
+This directory contains the integration code for connecting ARFlow to Acumatica ERP.
 
 ## Version Compatibility
 
@@ -36,7 +36,7 @@ This integration was built specifically against Acumatica version 2025 R1. Diffe
 
 ### Supported Endpoints
 
-- **Salesperson** - For mapping salespeople to CommissionFlow users
+- **Salesperson** - For mapping salespeople to ARFlow users
 - **SalesInvoice** - For importing sales transactions and calculating commissions
 - **Customer** - For customer data synchronization
 - **Project** - For project-based commission tracking

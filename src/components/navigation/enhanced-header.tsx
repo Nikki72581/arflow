@@ -159,7 +159,7 @@ export function EnhancedHeader({
           <div className="h-8 w-8 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 rounded-lg flex items-center justify-center">
             <DollarSign className="h-5 w-5 text-white" />
           </div>
-          <span className="hidden sm:inline-block font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">CommissionFlow</span>
+          <span className="hidden sm:inline-block font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">ARFlow</span>
         </Link>
 
         {/* Organization Info */}

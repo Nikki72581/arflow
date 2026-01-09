@@ -24,7 +24,7 @@ import { PlaceholderUserActions } from '@/components/team/placeholder-user-actio
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Team | CommissionFlow',
+  title: 'Team | ARFlow',
   description: 'Manage your team members',
 }
 

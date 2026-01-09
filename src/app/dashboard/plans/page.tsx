@@ -20,7 +20,7 @@ import { formatDate } from '@/lib/utils'
 import { getRuleTypeLabel } from '@/lib/commission-calculator'
 export const dynamic = 'force-dynamic'
 export const metadata = {
-  title: 'Commission Plans | CommissionFlow',
+  title: 'Commission Plans | ARFlow',
   description: 'Manage your commission plans',
 }
 

@@ -21,12 +21,11 @@ import {
 import Link from 'next/link'
 import Image from 'next/image'
 import { getAcumaticaIntegration } from '@/actions/integrations/acumatica/connection'
-import { AcumaticaIntegrationActions } from '@/components/integrations/acumatica-integration-actions'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Integrations | CommissionFlow',
+  title: 'Integrations | ARFlow',
   description: 'Manage your accounting system integrations',
 }
 
@@ -56,10 +55,10 @@ async function getIntegrations(): Promise<Integration[]> {
         ? new Date(acumaticaIntegration.lastSyncAt).toLocaleString()
         : undefined,
       features: [
-        'Automatic sales data sync',
+        'Automatic AR document sync',
         'Customer account matching',
-        'Real-time commission calculations',
-        'Invoice integration'
+        'Invoice and payment tracking',
+        'Document integration'
       ],
       setupUrl: acumaticaIntegration
         ? '/dashboard/integrations/acumatica/setup'
@@ -116,7 +115,7 @@ export default async function IntegrationsPage() {
             Integrations
           </h1>
           <p className="text-muted-foreground">
-            Connect your accounting systems to automate commission calculations
+            Connect your accounting systems to automate AR document tracking
           </p>
         </div>
         {acumaticaIntegration && (
@@ -131,7 +130,12 @@ export default async function IntegrationsPage() {
                 Acumatica: {acumaticaIntegration.status === 'ACTIVE' ? 'Connected' : acumaticaIntegration.status}
               </div>
             </div>
-            <AcumaticaIntegrationActions setupUrl="/dashboard/integrations/acumatica/setup" />
+            <Link href="/dashboard/integrations/acumatica/setup">
+              <Button variant="outline" size="sm">
+                <Settings className="h-4 w-4 mr-2" />
+                Manage
+              </Button>
+            </Link>
           </div>
         )}
       </div>
@@ -248,12 +252,13 @@ export default async function IntegrationsPage() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  {integration.status === 'connected' && integration.id === 'acumatica' ? (
-                    <AcumaticaIntegrationActions setupUrl={integration.setupUrl || '/dashboard/integrations/acumatica/setup'} />
-                  ) : integration.status === 'connected' ? (
-                    <Button variant="outline" size="sm" className="gap-2">
-                      Manage
-                    </Button>
+                  {integration.status === 'connected' || integration.status === 'configured' ? (
+                    <Link href={integration.setupUrl || '#'}>
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <Settings className="h-4 w-4" />
+                        Manage
+                      </Button>
+                    </Link>
                   ) : integration.comingSoon ? (
                     <Button disabled className="gap-2">
                       <Clock className="h-4 w-4" />

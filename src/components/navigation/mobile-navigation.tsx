@@ -156,7 +156,7 @@ export function MobileHeader({
           <SheetContent side="left" className="w-80 p-0">
             <div className="flex h-full flex-col">
               <div className="border-b p-4">
-                <h2 className="text-lg font-semibold">CommissionFlow</h2>
+                <h2 className="text-lg font-semibold">ARFlow</h2>
               </div>
               <div className="flex-1 overflow-y-auto">
                 <EnhancedSidebar
@@ -170,7 +170,7 @@ export function MobileHeader({
 
         {/* Logo */}
         <Link href="/dashboard" className="font-bold">
-          CommissionFlow
+          ARFlow
         </Link>
 
         {/* Notifications Badge */}

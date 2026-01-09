@@ -19,7 +19,7 @@ import { ProjectActions } from '@/components/projects/project-actions'
 import { formatDate } from '@/lib/utils'
 export const dynamic = 'force-dynamic'
 export const metadata = {
-  title: 'Projects | CommissionFlow',
+  title: 'Projects | ARFlow',
   description: 'Manage your projects',
 }
 

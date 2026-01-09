@@ -5,10 +5,10 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 
 // Email configuration
 export const EMAIL_CONFIG = {
-  from: process.env.RESEND_FROM_EMAIL || 'noreply@commissionflow.com',
+  from: process.env.RESEND_FROM_EMAIL || 'noreply@arflow.app',
   replyTo: process.env.RESEND_REPLY_TO_EMAIL,
-  companyName: process.env.COMPANY_NAME || 'CommissionFlow',
-  companyUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://commissionflow.app',
+  companyName: process.env.COMPANY_NAME || 'ARFlow',
+  companyUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://arflow.app',
 }
 
 export { resend }
