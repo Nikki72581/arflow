@@ -3,7 +3,7 @@ import { auth } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/db'
 
 type SearchResult = {
-  type: 'client' | 'invoice' | 'payment' | 'team'
+  type: 'client' | 'document' | 'payment' | 'team'
   id: string
   title: string
   subtitle?: string
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
         title: client.companyName,
         subtitle: client.contactName || client.email || undefined,
         metadata: {
-          invoices: `${client._count.arDocuments} invoice${client._count.arDocuments !== 1 ? 's' : ''}`,
+          documents: `${client._count.arDocuments} document${client._count.arDocuments !== 1 ? 's' : ''}`,
           balance: `$${client.currentBalance.toLocaleString()}`,
           ...(client.phone ? { phone: client.phone } : {})
         },
@@ -90,8 +90,8 @@ export async function GET(request: NextRequest) {
       })
     })
 
-    // Search Invoices
-    const invoices = await prisma.arDocument.findMany({
+    // Search Documents
+    const documents = await prisma.arDocument.findMany({
       where: {
         organizationId: orgId,
         OR: [
@@ -108,22 +108,31 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    invoices.forEach(invoice => {
-      const invoiceTitle = invoice.documentNumber
-        ? `Invoice ${invoice.documentNumber}`
-        : `Invoice ${invoice.id.slice(0, 8)}`
+    documents.forEach(doc => {
+      // Map document type to display name
+      const typeMap: Record<string, string> = {
+        'INVOICE': 'Invoice',
+        'QUOTE': 'Quote',
+        'ORDER': 'Order',
+        'CREDIT_MEMO': 'Credit Memo',
+        'DEBIT_MEMO': 'Debit Memo'
+      }
+      const docType = typeMap[doc.documentType] || doc.documentType
+      const docTitle = doc.documentNumber
+        ? `${docType} ${doc.documentNumber}`
+        : `${docType} ${doc.id.slice(0, 8)}`
       results.push({
-        type: 'invoice',
-        id: invoice.id,
-        title: invoiceTitle,
-        subtitle: invoice.customer.companyName,
-        description: invoice.description || undefined,
+        type: 'document',
+        id: doc.id,
+        title: docTitle,
+        subtitle: doc.customer.companyName,
+        description: doc.description || undefined,
         metadata: {
-          amount: `$${invoice.totalAmount.toLocaleString()}`,
-          status: invoice.status.toLowerCase(),
-          date: new Date(invoice.documentDate).toLocaleDateString()
+          amount: `$${doc.totalAmount.toLocaleString()}`,
+          status: doc.status.toLowerCase(),
+          date: new Date(doc.documentDate).toLocaleDateString()
         },
-        href: `/dashboard/clients/${invoice.customerId}`
+        href: `/dashboard/documents/${doc.id}`
       })
     })
 

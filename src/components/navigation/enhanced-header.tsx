@@ -179,7 +179,7 @@ export function EnhancedHeader({
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Search clients, invoices, payments... (Press / to focus)"
+              placeholder="Search clients, documents, payments... (Press / to focus)"
               className={cn(
                 'w-full pl-9 pr-4',
                 searchFocused && 'ring-2 ring-primary'

@@ -27,6 +27,8 @@ enum PlanTier {
 
 enum DocumentType {
   INVOICE
+  QUOTE
+  ORDER
   CREDIT_MEMO
   DEBIT_MEMO
 }
@@ -152,6 +154,7 @@ model Organization {
   paymentApplications  PaymentApplication[]
   auditLogs            AuditLog[]
   acumaticaIntegration AcumaticaIntegration?
+  documentTypeSettings DocumentTypeSetting[]
 
   @@map("organizations")
 }
@@ -317,6 +320,24 @@ model ArDocument {
   @@index([documentDate])
   @@index([dueDate])
   @@map("ar_documents")
+}
+
+model DocumentTypeSetting {
+  id             String       @id @default(cuid())
+  organizationId String
+  documentType   DocumentType
+  enabled        Boolean      @default(true)
+  displayName    String // Customizable display name (e.g., "Quote" -> "Estimate")
+  displayOrder   Int          @default(0) // Order for tabs display
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, documentType])
+  @@index([organizationId])
+  @@index([enabled])
+  @@map("document_type_settings")
 }
 
 // ============================================

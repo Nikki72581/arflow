@@ -239,28 +239,29 @@ async function ClientDetails({ clientId }: { clientId: string }) {
           </CardContent>
         </Card>
 
-        {/* Recent Invoices */}
+        {/* Recent Documents */}
         <Card className="md:col-span-2">
           <CardHeader>
-            <CardTitle>Recent Invoices</CardTitle>
+            <CardTitle>Recent Documents</CardTitle>
           </CardHeader>
           <CardContent>
             {customer.arDocuments.length === 0 ? (
               <EmptyState
                 icon={FileText}
-                title="No invoices yet"
-                description="Invoices will appear here once they are created or synced."
+                title="No documents yet"
+                description="Documents will appear here once they are created or synced."
               />
             ) : (
               <div className="space-y-3">
                 {customer.arDocuments.map((doc) => (
-                  <div
+                  <Link
                     key={doc.id}
-                    className="flex items-center justify-between rounded-lg border p-4"
+                    href={`/dashboard/documents/${doc.id}`}
+                    className="flex items-center justify-between rounded-lg border p-4 hover:bg-accent/50 transition-colors"
                   >
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">{doc.documentNumber}</span>
+                        <span className="font-medium text-purple-700 dark:text-purple-400">{doc.documentNumber}</span>
                         <Badge
                           variant={
                             doc.status === 'OPEN'
@@ -287,7 +288,7 @@ async function ClientDetails({ clientId }: { clientId: string }) {
                         <span>{formatCurrency(doc.totalAmount)}</span>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}
