@@ -14,6 +14,8 @@ import { prisma } from '@/lib/db'
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: "ARFlow - B2B Accounts Receivable Portal",
   description: "Give your customers clarity on every invoice with a secure, self-service portal for viewing invoices and managing their account.",
