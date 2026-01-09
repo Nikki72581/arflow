@@ -1,23 +1,19 @@
-# CommissionFlow
+# ARFlow
 
-A modern, full-stack commission management platform built with Next.js. Track sales, manage commission plans, calculate payouts, and streamline your sales team operations.
+A modern B2B Accounts Receivable portal built with Next.js. Give your customers clarity on every invoice with a secure, self-service portal for viewing invoices, checking balances, and managing their account.
 
 ## Features
 
 ### Core Functionality
-- **Client & Project Management** - Organize clients and projects with full CRUD operations
-- **Commission Plan Builder** - Create flexible commission structures with multiple rule types
-  - Percentage-based commissions
-  - Flat amount commissions
-  - Tiered/accelerator commissions with thresholds
-  - Min/max caps on payouts
-- **Sales Tracking** - Record sales transactions and link them to projects
-- **Automatic Calculations** - Apply commission plans to sales automatically
-- **Salesperson Portal** - Self-service dashboard for sales team members
-- **Bulk Payouts** - Process multiple commission payments at once
-- **Email Notifications** - Automated notifications for approvals and payments
+- **Customer Management** - Organize and manage your customer accounts
+- **Invoice Portal** - Customers can securely view their invoices and account details
+- **Document Management** - Track invoices, credit memos, and debit memos
+- **Balance Tracking** - Real-time account balance and aging reports
+- **Payment Recording** - Track payments and applications to invoices
+- **PDF Statements** - Generate and download customer statements
+- **CSV Import** - Bulk import invoices from your accounting system
+- **Admin Dashboard** - Complete AR overview with aging analysis
 - **Audit Logs** - Comprehensive activity tracking for compliance
-- **Reporting & Analytics** - Dashboards, charts, and export capabilities
 
 ### Technical Features
 - Multi-tenant organization support with Clerk authentication
@@ -26,7 +22,7 @@ A modern, full-stack commission management platform built with Next.js. Track sa
 - Responsive UI built with Tailwind CSS and shadcn/ui
 - PostgreSQL database with Prisma ORM
 - CSV import/export functionality
-- Comprehensive test coverage (unit, integration, E2E)
+- Acumatica ERP integration support
 
 ## Tech Stack
 
@@ -54,8 +50,8 @@ A modern, full-stack commission management platform built with Next.js. Track sa
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd commissionflow
+git clone https://github.com/Nikki72581/arflow
+cd arflow
 ```
 
 2. Install dependencies:
@@ -109,33 +105,28 @@ npm run dev
 ## Project Structure
 
 ```
-commissionflow/
-├── app/
-│   ├── actions/           # Server actions for data mutations
-│   ├── api/              # API routes (webhooks, etc.)
-│   ├── dashboard/        # Main application pages
-│   │   ├── clients/      # Client management
-│   │   ├── projects/     # Project management
-│   │   ├── plans/        # Commission plan builder
-│   │   ├── sales/        # Sales transaction tracking
-│   │   ├── commissions/  # Commission calculations & approvals
-│   │   ├── my-commissions/ # Salesperson portal
-│   │   └── audit-logs/   # Audit log viewer
-│   └── (auth)/           # Authentication pages
-├── components/
-│   ├── ui/              # shadcn/ui components
-│   ├── clients/         # Client-specific components
-│   ├── projects/        # Project-specific components
-│   ├── plans/           # Commission plan components
-│   ├── sales/           # Sales components
-│   ├── commissions/     # Commission components
-│   └── shared/          # Shared components
-├── lib/
-│   ├── validations/     # Zod schemas for validation
-│   ├── commission-calculator.ts  # Commission calculation engine
-│   ├── email.ts         # Email service
-│   ├── audit-log.ts     # Audit logging utilities
-│   └── utils.ts         # Utility functions
+arflow/
+├── src/
+│   ├── app/
+│   │   ├── actions/           # Server actions for data mutations
+│   │   ├── api/              # API routes (webhooks, etc.)
+│   │   ├── dashboard/        # Main application pages
+│   │   │   ├── customers/    # Customer management
+│   │   │   ├── invoices/     # Invoice management
+│   │   │   ├── payments/     # Payment tracking
+│   │   │   └── portal/       # Customer self-service portal
+│   │   └── (auth)/           # Authentication pages
+│   ├── components/
+│   │   ├── ui/              # shadcn/ui components
+│   │   ├── customers/       # Customer-specific components
+│   │   ├── invoices/        # Invoice components
+│   │   ├── payments/        # Payment components
+│   │   └── shared/          # Shared components
+│   └── lib/
+│       ├── validations/     # Zod schemas for validation
+│       ├── email.ts         # Email service
+│       ├── audit-log.ts     # Audit logging utilities
+│       └── utils.ts         # Utility functions
 ├── prisma/
 │   ├── schema.prisma    # Database schema
 │   └── seed.ts          # Seed script
@@ -162,63 +153,36 @@ npm run test:e2e         # Run E2E tests
 npm run test:coverage    # Generate coverage report
 ```
 
-## Documentation
-
-### Implementation Guides
-- [STEP-2-README.md](STEP-2-README.md) - Clients & Projects Management
-- [STEP-3-README.md](STEP-3-README.md) - Commission Plan Builder
-- [STEP-4-README.md](STEP-4-README.md) - Sales Data & Calculations
-- [STEP-5-INSTALL.md](STEP-5-INSTALL.md) - Reporting & Dashboards
-- [STEP-6-GUIDE.md](STEP-6-GUIDE.md) - Advanced Features
-
-### Quick Reference
-- [STEP-3-QUICK-REFERENCE.md](STEP-3-QUICK-REFERENCE.md) - Commission plans quick reference
-- [STEP-4-QUICK-REFERENCE.md](STEP-4-QUICK-REFERENCE.md) - Sales & calculations quick reference
-- [STEP-6-QUICK-REFERENCE.md](STEP-6-QUICK-REFERENCE.md) - Advanced features quick reference
-
-### Setup Guides
-- [RESEND-SETUP.md](RESEND-SETUP.md) - Email service configuration
-- [INTEGRATION-GUIDE.md](INTEGRATION-GUIDE.md) - Email notification integration
-- [TEAM_INVITATIONS_SETUP.md](TEAM_INVITATIONS_SETUP.md) - Team invitation setup
-- [FILE-STRUCTURE.md](FILE-STRUCTURE.md) - Detailed project structure
-
-### Testing
-- [TESTING.md](TESTING.md) - Comprehensive testing guide
-- [TESTING-SUMMARY.md](TESTING-SUMMARY.md) - Test infrastructure overview
-- [TEST-IDS-GUIDE.md](TEST-IDS-GUIDE.md) - Guide for adding test IDs to components
-
 ## Key Features
 
-### Multi-Rule Commission Plans
-Stack multiple commission rules to create complex compensation structures:
-- Base percentage commission (e.g., 5% of all sales)
-- Bonus for large deals (e.g., $1,000 for sales over $50k)
-- Accelerator for high performers (e.g., additional 2% above $100k)
+### Customer Portal
+Your customers get secure access to:
+- View all invoices (open, partial, paid)
+- Check current account balance
+- See aging summary
+- Download statements
+- View payment history
+
+### Admin Dashboard
+Comprehensive AR management:
+- Total AR outstanding
+- AR aging analysis (Current, 1-30, 31-60, 61-90, 90+ days)
+- Customer list with balances
+- Recent payments
+- Overdue accounts tracking
+
+### Invoice Management
+- Import invoices via CSV
+- Manual invoice entry
+- Support for invoices, credit memos, and debit memos
+- Track document status (Open, Partial, Paid, Void)
+- Payment application tracking
 
 ### Organization Multi-Tenancy
 All data is automatically scoped to organizations:
 - Secure data isolation between organizations
 - Users can belong to multiple organizations
 - Automatic filtering in all queries
-
-### Type-Safe Server Actions
-All data operations use Next.js Server Actions with full type safety:
-```typescript
-const result = await createCommissionPlan({
-  name: "Standard Sales",
-  isActive: true
-})
-
-if (result.success) {
-  console.log(result.data) // Fully typed
-}
-```
-
-### Workflow Automation
-- Commissions automatically calculated when sales are recorded
-- Email notifications sent on approval and payment
-- Bulk payout processing for efficiency
-- Complete audit trail for compliance
 
 ## Troubleshooting
 
@@ -238,9 +202,6 @@ Install required shadcn/ui components:
 npx shadcn-ui@latest add button card input label table badge dialog
 ```
 
-### Testing Issues
-See [TESTING.md](TESTING.md) for detailed troubleshooting guides.
-
 ## Contributing
 
 This is a private project. Please contact the repository owner for contribution guidelines.
@@ -251,4 +212,4 @@ Proprietary - All rights reserved.
 
 ## Support
 
-For questions or issues, please contact the development team or create an issue in the repository.
+For questions or issues, please create an issue in the [GitHub repository](https://github.com/Nikki72581/arflow/issues).

@@ -44,85 +44,72 @@ interface NavItem {
   badgeVariant?: 'default' | 'destructive' | 'secondary' | 'success' | 'warning' | 'info'
   children?: NavItem[]
   adminOnly?: boolean
-  salesPersonOnly?: boolean
+  customerOnly?: boolean
   iconColor?: string
   sectionColor?: string
 }
 
-// Navigation structure
+// Navigation structure for ARFlow
 const navigation: NavItem[] = [
   {
     title: 'Dashboard',
     href: '/dashboard',
     icon: LayoutDashboard,
-    iconColor: 'text-blue-600 dark:text-blue-400',
+    iconColor: 'text-teal-600 dark:text-teal-400',
   },
   {
-    title: 'Sales Management',
-    icon: ShoppingCart,
-    iconColor: 'text-purple-600 dark:text-purple-400',
-    sectionColor: 'border-purple-500/30',
+    title: 'AR Management',
+    icon: FileText,
+    iconColor: 'text-blue-600 dark:text-blue-400',
+    sectionColor: 'border-blue-500/30',
+    adminOnly: true,
     children: [
       {
-        title: 'Sales',
-        href: '/dashboard/sales',
-        icon: ShoppingCart,
-        iconColor: 'text-purple-600 dark:text-purple-400',
-      },
-      {
-        title: 'Clients',
-        href: '/dashboard/clients',
+        title: 'Customers',
+        href: '/dashboard/customers',
         icon: Users,
-        iconColor: 'text-purple-600 dark:text-purple-400',
+        iconColor: 'text-blue-600 dark:text-blue-400',
       },
       {
-        title: 'Projects',
-        href: '/dashboard/projects',
-        icon: FolderKanban,
-        iconColor: 'text-purple-600 dark:text-purple-400',
+        title: 'Invoices',
+        href: '/dashboard/invoices',
+        icon: FileText,
+        iconColor: 'text-blue-600 dark:text-blue-400',
+      },
+      {
+        title: 'Payments',
+        href: '/dashboard/payments',
+        icon: CreditCard,
+        iconColor: 'text-emerald-600 dark:text-emerald-400',
       },
     ],
   },
   {
-    title: 'Commissions',
-    icon: DollarSign,
-    iconColor: 'text-emerald-600 dark:text-emerald-400',
-    sectionColor: 'border-emerald-500/30',
+    title: 'My Account',
+    icon: User,
+    iconColor: 'text-purple-600 dark:text-purple-400',
+    sectionColor: 'border-purple-500/30',
+    customerOnly: true,
     children: [
       {
-        title: 'All Commissions',
-        href: '/dashboard/commissions',
-        icon: DollarSign,
-        iconColor: 'text-emerald-600 dark:text-emerald-400',
+        title: 'My Invoices',
+        href: '/dashboard/portal/invoices',
+        icon: FileText,
+        iconColor: 'text-purple-600 dark:text-purple-400',
+        badge: 'openInvoicesCount',
+        badgeVariant: 'info',
       },
       {
-        title: 'Pending Approvals',
-        href: '/dashboard/commissions/pending',
-        icon: CheckCircle,
-        iconColor: 'text-amber-600 dark:text-amber-400',
-        badge: 'pendingCount', // Will be replaced with actual count
-        badgeVariant: 'warning',
-        adminOnly: true,
-      },
-      {
-        title: 'Bulk Payouts',
-        href: '/dashboard/commissions/payouts',
+        title: 'Payment History',
+        href: '/dashboard/portal/payments',
         icon: CreditCard,
         iconColor: 'text-emerald-600 dark:text-emerald-400',
-        adminOnly: true,
       },
       {
-        title: 'Payout History',
-        href: '/dashboard/commissions/payout-history',
-        icon: Receipt,
-        iconColor: 'text-emerald-600 dark:text-emerald-400',
-        adminOnly: true,
-      },
-      {
-        title: 'Commission Plans',
-        href: '/dashboard/plans',
-        icon: FileText,
-        iconColor: 'text-emerald-600 dark:text-emerald-400',
+        title: 'Account Summary',
+        href: '/dashboard/portal/summary',
+        icon: BarChart3,
+        iconColor: 'text-cyan-600 dark:text-cyan-400',
       },
     ],
   },
@@ -131,13 +118,7 @@ const navigation: NavItem[] = [
     href: '/dashboard/reports',
     icon: BarChart3,
     iconColor: 'text-cyan-600 dark:text-cyan-400',
-  },
-  {
-    title: 'My Commissions',
-    href: '/dashboard/my-commissions',
-    icon: User,
-    iconColor: 'text-pink-600 dark:text-pink-400',
-    salesPersonOnly: true,
+    adminOnly: true,
   },
   {
     title: 'Administration',
@@ -147,37 +128,9 @@ const navigation: NavItem[] = [
     adminOnly: true,
     children: [
       {
-        title: 'Admin Dashboard',
-        href: '/dashboard/admin',
-        icon: LayoutDashboard,
-        iconColor: 'text-indigo-600 dark:text-indigo-400',
-        adminOnly: true,
-      },
-      {
         title: 'Team Members',
         href: '/dashboard/team',
         icon: Users,
-        iconColor: 'text-indigo-600 dark:text-indigo-400',
-        adminOnly: true,
-      },
-       {
-        title: 'Product Categories',
-        href: '/dashboard/settings/product-categories',
-        icon: ShoppingCart,
-        iconColor: 'text-indigo-600 dark:text-indigo-400',
-        adminOnly: true,
-      },
-      {
-        title: 'Territories',
-        href: '/dashboard/settings/territories',
-        icon: Shield,
-        iconColor: 'text-indigo-600 dark:text-indigo-400',
-        adminOnly: true,
-      },
-      {
-        title: 'Customer Tiers',
-        href: '/dashboard/settings/customer-tiers',
-        icon: User,
         iconColor: 'text-indigo-600 dark:text-indigo-400',
         adminOnly: true,
       },
@@ -202,16 +155,8 @@ const navigation: NavItem[] = [
         iconColor: 'text-indigo-600 dark:text-indigo-400',
         adminOnly: true,
       },
-      {
-        title: 'Demo Data',
-        href: '/dashboard/admin/demo-data',
-        icon: Database,
-        iconColor: 'text-indigo-600 dark:text-indigo-400',
-        adminOnly: true,
-      },
     ],
   },
-
   {
     title: 'Help & Support',
     href: '/dashboard/help',
@@ -221,17 +166,17 @@ const navigation: NavItem[] = [
 ]
 
 interface EnhancedSidebarProps {
-  userRole?: 'ADMIN' | 'SALESPERSON'
-  pendingCount?: number
-  unpaidCount?: number
+  userRole?: 'ADMIN' | 'CUSTOMER'
+  openInvoicesCount?: number
+  overdueCount?: number
   userName?: string
   organizationName?: string
 }
 
 export function EnhancedSidebar({
   userRole = 'ADMIN',
-  pendingCount = 0,
-  unpaidCount = 0,
+  openInvoicesCount = 0,
+  overdueCount = 0,
   userName,
   organizationName,
 }: EnhancedSidebarProps) {
@@ -257,7 +202,7 @@ export function EnhancedSidebar({
         }
       }
     }
-    return ['Sales Management', 'Commissions', 'Administration']
+    return ['AR Management', 'My Account', 'Administration']
   })
 
   // Persist collapsed state and update CSS variable
@@ -295,14 +240,14 @@ export function EnhancedSidebar({
 
   const isItemVisible = (item: NavItem) => {
     if (item.adminOnly && userRole !== 'ADMIN') return false
-    if (item.salesPersonOnly && userRole !== 'SALESPERSON') return false
+    if (item.customerOnly && userRole !== 'CUSTOMER') return false
     return true
   }
 
   const getBadgeValue = (badge?: string | number) => {
     if (typeof badge === 'number') return badge
-    if (badge === 'pendingCount') return pendingCount
-    if (badge === 'unpaidCount') return unpaidCount
+    if (badge === 'openInvoicesCount') return openInvoicesCount
+    if (badge === 'overdueCount') return overdueCount
     return badge
   }
 
@@ -531,60 +476,60 @@ export function EnhancedSidebar({
       </div>
 
       {/* Quick Stats */}
-      {userRole === 'ADMIN' && (pendingCount > 0 || unpaidCount > 0) && (
+      {userRole === 'ADMIN' && (openInvoicesCount > 0 || overdueCount > 0) && (
         <div className="border-t border-border/50 bg-gradient-to-br from-amber-500/5 via-transparent to-red-500/5 p-4">
           {!isCollapsed ? (
             <>
               <p className="text-xs font-semibold text-muted-foreground mb-3">Action Required</p>
               <div className="space-y-2 text-sm">
-                {pendingCount > 0 && (
-                  <div className="flex items-center justify-between rounded-lg bg-amber-500/10 px-3 py-2 hover:bg-amber-500/20 transition-colors">
-                    <span className="text-amber-900 dark:text-amber-100 font-medium">Pending Approval</span>
-                    <Badge variant="warning">{pendingCount}</Badge>
+                {overdueCount > 0 && (
+                  <div className="flex items-center justify-between rounded-lg bg-red-500/10 px-3 py-2 hover:bg-red-500/20 transition-colors">
+                    <span className="text-red-900 dark:text-red-100 font-medium">Overdue</span>
+                    <Badge variant="destructive">{overdueCount}</Badge>
                   </div>
                 )}
-                {unpaidCount > 0 && (
+                {openInvoicesCount > 0 && (
                   <div className="flex items-center justify-between rounded-lg bg-blue-500/10 px-3 py-2 hover:bg-blue-500/20 transition-colors">
-                    <span className="text-blue-900 dark:text-blue-100 font-medium">Unpaid</span>
-                    <Badge variant="info">{unpaidCount}</Badge>
+                    <span className="text-blue-900 dark:text-blue-100 font-medium">Open Invoices</span>
+                    <Badge variant="info">{openInvoicesCount}</Badge>
                   </div>
                 )}
               </div>
             </>
           ) : (
             <div className="flex flex-col items-center gap-2">
-              {pendingCount > 0 && (
+              {overdueCount > 0 && (
                 <TooltipProvider delayDuration={0}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-amber-500/20">
-                        <CheckCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                        <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
-                          {pendingCount}
+                      <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-red-500/20">
+                        <CheckCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                        <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                          {overdueCount}
                         </span>
                       </div>
                     </TooltipTrigger>
                     <TooltipContent side="right">
-                      <p className="font-medium">Pending Approval</p>
-                      <p className="text-xs text-muted-foreground">{pendingCount} items</p>
+                      <p className="font-medium">Overdue Invoices</p>
+                      <p className="text-xs text-muted-foreground">{overdueCount} items</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               )}
-              {unpaidCount > 0 && (
+              {openInvoicesCount > 0 && (
                 <TooltipProvider delayDuration={0}>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/20">
-                        <DollarSign className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                         <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white">
-                          {unpaidCount}
+                          {openInvoicesCount}
                         </span>
                       </div>
                     </TooltipTrigger>
                     <TooltipContent side="right">
-                      <p className="font-medium">Unpaid Commissions</p>
-                      <p className="text-xs text-muted-foreground">{unpaidCount} items</p>
+                      <p className="font-medium">Open Invoices</p>
+                      <p className="text-xs text-muted-foreground">{openInvoicesCount} items</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>

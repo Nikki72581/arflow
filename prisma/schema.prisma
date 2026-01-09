@@ -15,7 +15,7 @@ datasource db {
 
 enum UserRole {
   ADMIN
-  SALESPERSON
+  CUSTOMER
 }
 
 enum PlanTier {
@@ -25,49 +25,38 @@ enum PlanTier {
   ENTERPRISE
 }
 
-enum CommissionStatus {
-  PENDING
-  CALCULATED
-  APPROVED
+enum DocumentType {
+  INVOICE
+  CREDIT_MEMO
+  DEBIT_MEMO
+}
+
+enum DocumentStatus {
+  OPEN
+  PARTIAL
   PAID
+  VOID
 }
 
-enum PayoutStatus {
+enum PaymentStatus {
   PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
+  APPLIED
+  VOID
 }
 
-enum CommissionRuleType {
-  PERCENTAGE // % of revenue
-  FLAT_AMOUNT // Fixed amount per sale
-  TIERED // Different rates at different thresholds
+enum PaymentMethod {
+  CHECK
+  WIRE
+  ACH
+  CREDIT_CARD
+  OTHER
 }
 
-enum CommissionBasis {
-  GROSS_REVENUE // Full invoice amount (default)
-  NET_SALES // Invoice minus returns/credits
-}
-
-enum TransactionType {
-  SALE // Regular sale
-  RETURN // Return/credit
-  ADJUSTMENT // Manual adjustment
-}
-
-enum CustomerTier {
-  STANDARD // Default tier
-  VIP // High-value customers
-  NEW // New customers
-  ENTERPRISE // Large enterprise deals
-}
-
-enum ClientStatus {
-  ACTIVE // Active client
-  INACTIVE // Inactive client
-  PROSPECTIVE // Potential client
-  CHURNED // Lost client
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  ON_HOLD
+  COLLECTIONS
 }
 
 enum RecordSourceType {
@@ -104,33 +93,6 @@ enum CustomerIdSource {
   BACCOUNT_ID // Internal database ID
 }
 
-enum NoProjectHandling {
-  NO_PROJECT // Create sale without project association
-  DEFAULT_PROJECT // Create/use a default "General Sales" project per client
-}
-
-enum ImportLevel {
-  INVOICE_TOTAL // One sale per invoice
-  LINE_LEVEL // One sale per invoice line
-}
-
-enum InvoiceAmountField {
-  DOC_TOTAL // Includes tax and freight
-  AMOUNT // Before tax (most common)
-  LINES_TOTAL // Sum of line amounts only
-}
-
-enum LineAmountField {
-  EXTENDED_PRICE // Qty × Unit Price
-  AMOUNT // After line-level discounts
-}
-
-enum LineFilterMode {
-  ALL
-  ITEM_CLASS
-  GL_ACCOUNT
-}
-
 enum DataSourceType {
   REST_API // Standard Invoice/SalesInvoice/SalesOrder entities
   GENERIC_INQUIRY // Custom Generic Inquiry via OData
@@ -138,23 +100,23 @@ enum DataSourceType {
 }
 
 enum UnmappedAction {
-  SKIP // Don't import records without mapped salesperson
-  DEFAULT_USER // Assign to defaultSalespersonUserId
+  SKIP // Don't import records without mapped customer
+  DEFAULT_USER // Assign to defaultCustomerUserId
 }
 
-enum SalespersonMappingStatus {
+enum CustomerMappingStatus {
   PENDING // Needs action from admin
   MATCHED // Successfully mapped to a user
   PLACEHOLDER // Will create placeholder user on sync
-  IGNORED // Admin chose to skip this salesperson
+  IGNORED // Admin chose to skip this customer
 }
 
-enum SalespersonMatchType {
+enum CustomerMatchType {
   AUTO_EMAIL // Matched automatically by email
   AUTO_NAME // Matched automatically by name
   AUTO_PLACEHOLDER // Will auto-create placeholder user
   MANUAL // Manually selected by admin
-  CREATED_NEW // Admin created a new user for this salesperson
+  CREATED_NEW // Admin created a new user for this customer
 }
 
 enum SyncType {
@@ -170,105 +132,104 @@ enum SyncStatus {
   FAILED
 }
 
-enum RuleScope {
-  GLOBAL // Apply to all transactions (default)
-  CUSTOMER_TIER // Apply to specific customer tier
-  PRODUCT_CATEGORY // Apply to specific product category
-  TERRITORY // Apply to specific territory
-  CUSTOMER_SPECIFIC // Apply to specific customer
-}
-
-enum RulePriority {
-  PROJECT_SPECIFIC // Highest - 100
-  CUSTOMER_SPECIFIC // 90
-  PRODUCT_CATEGORY // 80
-  TERRITORY // 70
-  CUSTOMER_TIER // 60
-  DEFAULT // Lowest - 50
-}
-
 // ============================================
 // CORE MODELS
 // ============================================
 
 model Organization {
-  id              String   @id @default(cuid())
-  name            String
-  slug            String   @unique
-  clerkOrgId      String?  @unique // Clerk organization ID for team invitations
-  planTier        PlanTier @default(STARTER)
-  requireProjects Boolean  @default(false) // Whether projects are required for sales transactions
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id         String   @id @default(cuid())
+  name       String
+  slug       String   @unique
+  clerkOrgId String?  @unique // Clerk organization ID for team invitations
+  planTier   PlanTier @default(STARTER)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  users                  User[]
-  clients                Client[]
-  projects               Project[]
-  commissionPlans        CommissionPlan[]
-  salesTransactions      SalesTransaction[]
-  commissionCalculations CommissionCalculation[]
-  payouts                Payout[]
-  auditLogs              AuditLog[]
-  productCategories      ProductCategory[]
-  territories            Territory[]
-  acumaticaIntegration   AcumaticaIntegration?
+  users                User[]
+  customers            Customer[]
+  arDocuments          ArDocument[]
+  payments             CustomerPayment[]
+  paymentApplications  PaymentApplication[]
+  auditLogs            AuditLog[]
+  acumaticaIntegration AcumaticaIntegration?
 
   @@map("organizations")
 }
 
 model User {
-  id             String     @id @default(cuid())
-  clerkId        String?    @unique // Nullable for placeholder users not yet invited
+  id             String   @id @default(cuid())
+  clerkId        String?  @unique // Nullable for placeholder users not yet invited
   email          String
   firstName      String?
   lastName       String?
-  role           UserRole   @default(SALESPERSON)
+  role           UserRole @default(CUSTOMER)
   organizationId String
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-  auditLogs      AuditLog[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Placeholder user tracking
-  isPlaceholder Boolean  @default(false) // True if user created without Clerk invite
+  isPlaceholder Boolean   @default(false) // True if user created without Clerk invite
   invitedAt     DateTime? // When Clerk invitation was sent (null for placeholders)
 
-  // External system integration IDs
-  employeeId    String? // Optional Employee ID for external systems
-  salespersonId String? // Optional Salesperson ID for external systems
+  // Customer-specific fields (when role = CUSTOMER)
+  customerId String? @unique // Reference to Customer record if this is a customer portal user
 
   // Notification preferences
   emailNotifications Boolean @default(true)
-  salesAlerts        Boolean @default(true)
-  commissionAlerts   Boolean @default(true)
-  weeklyReports      Boolean @default(false)
+  invoiceAlerts      Boolean @default(true)
+  paymentAlerts      Boolean @default(true)
+  statementAlerts    Boolean @default(false)
 
   // Theme preference
   themePreference String @default("system") // "light" | "dark" | "system"
 
-  organization           Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  salesTransactions      SalesTransaction[]
-  commissionCalculations CommissionCalculation[]
-  payouts                Payout[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  auditLogs    AuditLog[]
 
   @@index([organizationId])
   @@index([clerkId])
   @@index([email, organizationId])
   @@index([isPlaceholder])
+  @@index([customerId])
   @@map("users")
 }
 
-model Client {
-  id             String       @id @default(cuid())
-  name           String
+model Customer {
+  id             String         @id @default(cuid())
+  customerNumber String? // External customer number/code
+  companyName    String
+  contactName    String?
   email          String?
   phone          String?
-  address        String?
-  notes          String?
-  tier           CustomerTier @default(STANDARD)
-  status         ClientStatus @default(ACTIVE)
-  clientId       String? // External client ID for integrations
-  territoryId    String?
+  website        String?
   organizationId String
+
+  // Address fields
+  billingAddress1 String?
+  billingAddress2 String?
+  billingCity     String?
+  billingState    String?
+  billingZip      String?
+  billingCountry  String?
+
+  shippingAddress1 String?
+  shippingAddress2 String?
+  shippingCity     String?
+  shippingState    String?
+  shippingZip      String?
+  shippingCountry  String?
+
+  // AR Management fields
+  creditLimit     Float?         @default(0)
+  currentBalance  Float          @default(0) // Calculated field, updated on document/payment changes
+  status          CustomerStatus @default(ACTIVE)
+  paymentTerms    String? // e.g., "Net 30", "Net 60"
+  notes           String?
+
+  // Portal Access
+  portalEnabled Boolean   @default(false)
+  lastLoginAt   DateTime?
 
   // Integration Source Tracking
   externalId             String? // CustomerCD from Acumatica
@@ -280,271 +241,141 @@ model Client {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  territory         Territory?         @relation(fields: [territoryId], references: [id], onDelete: SetNull)
-  projects          Project[]
-  salesTransactions SalesTransaction[]
-  commissionRules   CommissionRule[]
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  arDocuments  ArDocument[]
+  payments     CustomerPayment[]
+  portalUsers  User[] // Portal users linked to this customer
 
   @@unique([organizationId, externalId, externalSystem])
   @@index([organizationId])
-  @@index([territoryId])
-  @@index([tier])
-  @@map("clients")
+  @@index([status])
+  @@index([customerNumber])
+  @@map("customers")
 }
 
-model Project {
-  id             String    @id @default(cuid())
-  name           String
-  description    String?
-  clientId       String
+// ============================================
+// AR DOCUMENT MODELS
+// ============================================
+
+model ArDocument {
+  id             String         @id @default(cuid())
   organizationId String
-  startDate      DateTime?
-  endDate        DateTime?
-  status         String    @default("active") // active, completed, cancelled
+  customerId     String
+  documentType   DocumentType
+  documentNumber String // Invoice number, CM number, etc.
+  referenceNumber String? // PO number, reference, etc.
 
-  // Integration Source Tracking
-  externalId             String? // ProjectCD from Acumatica
-  externalSystem         String? // "ACUMATICA" or null for manual
-  sourceType             RecordSourceType @default(MANUAL)
-  createdByIntegrationId String?
-  createdBySyncLogId     String?
+  // Dates
+  documentDate DateTime
+  dueDate      DateTime?
+  paidDate     DateTime? // When fully paid
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  // Amounts
+  subtotal    Float
+  taxAmount   Float  @default(0)
+  totalAmount Float
+  amountPaid  Float  @default(0)
+  balanceDue  Float // totalAmount - amountPaid
 
-  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  client            Client             @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  commissionPlans   CommissionPlan[]
-  salesTransactions SalesTransaction[]
+  // Status
+  status DocumentStatus @default(OPEN)
 
-  @@unique([organizationId, externalId, externalSystem])
-  @@index([organizationId])
-  @@index([clientId])
-  @@map("projects")
-}
-
-model ProductCategory {
-  id             String   @id @default(cuid())
-  name           String
-  description    String?
-  organizationId String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  salesTransactions SalesTransaction[]
-  commissionRules   CommissionRule[]
-
-  @@index([organizationId])
-  @@map("product_categories")
-}
-
-model Territory {
-  id             String   @id @default(cuid())
-  name           String
-  description    String?
-  organizationId String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  clients         Client[]
-  commissionRules CommissionRule[]
-
-  @@index([organizationId])
-  @@map("territories")
-}
-
-// ============================================
-// COMMISSION PLANNING MODELS
-// ============================================
-
-model CommissionPlan {
-  id              String          @id @default(cuid())
-  name            String
-  description     String?
-  projectId       String?
-  commissionBasis CommissionBasis @default(GROSS_REVENUE)
-  organizationId  String
-  isActive        Boolean         @default(true)
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-
-  organization           Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  project                Project?                @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  rules                  CommissionRule[]
-  commissionCalculations CommissionCalculation[]
-
-  @@index([organizationId])
-  @@index([projectId])
-  @@index([commissionBasis])
-  @@map("commission_plans")
-}
-
-model CommissionRule {
-  id               String             @id @default(cuid())
-  commissionPlanId String
-  ruleType         CommissionRuleType
-
-  // Existing fields
-  percentage     Float? // For PERCENTAGE type
-  flatAmount     Float? // For FLAT_AMOUNT type
-  tierThreshold  Float? // @deprecated - For TIERED type - revenue threshold
-  tierPercentage Float? // @deprecated - For TIERED type - rate above threshold
-  minAmount      Float? // Minimum commission
-  maxAmount      Float? // Maximum commission (cap)
-  description    String?
-
-  // NEW: Sale amount range filtering (works with any rule type)
-  minSaleAmount Float? // Sale must be >= this amount to apply this rule
-  maxSaleAmount Float? // Sale must be <= this amount to apply this rule (null = no upper limit)
-
-  // Scoping fields
-  scope    RuleScope    @default(GLOBAL)
-  priority RulePriority @default(DEFAULT)
-
-  // Applicability filters (nullable for backward compatibility)
-  customerTier      CustomerTier?
-  productCategoryId String?
-  territoryId       String?
-  clientId          String? // For customer-specific rules
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  commissionPlan  CommissionPlan   @relation(fields: [commissionPlanId], references: [id], onDelete: Cascade)
-  productCategory ProductCategory? @relation(fields: [productCategoryId], references: [id], onDelete: SetNull)
-  territory       Territory?       @relation(fields: [territoryId], references: [id], onDelete: SetNull)
-  client          Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
-
-  @@index([commissionPlanId])
-  @@index([scope])
-  @@index([priority])
-  @@index([productCategoryId])
-  @@index([territoryId])
-  @@index([clientId])
-  @@index([customerTier])
-  @@index([minSaleAmount, maxSaleAmount])
-  @@map("commission_rules")
-}
-
-// ============================================
-// TRANSACTION & CALCULATION MODELS
-// ============================================
-
-model SalesTransaction {
-  id                  String          @id @default(cuid())
-  amount              Float
-  transactionType     TransactionType @default(SALE)
-  parentTransactionId String?
-  projectId           String? // Optional - depends on organization.requireProjects setting
-  clientId            String? // Direct client reference (for when no project is assigned)
-  userId              String // Salesperson who made the sale
-  productCategoryId   String?
-  organizationId      String
-  transactionDate     DateTime        @default(now())
-  description         String?
-  invoiceNumber       String?
+  // Description and notes
+  description   String? // Line item description or summary
+  notes         String? // Internal notes
+  customerNotes String? // Notes visible to customer on portal
 
   // Integration Source Tracking
   sourceType     RecordSourceType @default(MANUAL)
   externalSystem String? // "ACUMATICA" or null
-  externalId     String? // RefNbr or RefNbr-LineNbr
+  externalId     String? // RefNbr from external system
   integrationId  String?
   syncLogId      String?
 
   // Acumatica Reference Data
-  externalInvoiceRef      String? // Invoice RefNbr
-  externalInvoiceDate     DateTime?
-  externalBranch          String?
-  externalLineNumber      Int? // For line-level imports
-  externalItemId          String?
-  externalItemDescription String?
-  externalItemClass       String?
-  externalGLAccount       String?
-  externalQuantity        Decimal?
-  externalUnitPrice       Decimal?
+  externalInvoiceRef  String? // Invoice RefNbr
+  externalBranch      String?
+  externalLineNumber  Int?
+  externalItemId      String?
+  externalDescription String?
 
   // Raw data for debugging
   rawExternalData Json?
 
-  // NEW v2: Custom field values from external systems
-  customFieldValues Json? // Key-value pairs of custom fields (e.g., {"sales_region": "WEST", "product_line": "Software"})
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer            Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  paymentApplications PaymentApplication[]
+
+  @@unique([organizationId, externalId, externalSystem])
+  @@index([organizationId])
+  @@index([customerId])
+  @@index([documentType])
+  @@index([status])
+  @@index([documentDate])
+  @@index([dueDate])
+  @@map("ar_documents")
+}
+
+// ============================================
+// PAYMENT MODELS
+// ============================================
+
+model CustomerPayment {
+  id             String        @id @default(cuid())
+  organizationId String
+  customerId     String
+  paymentNumber  String // Payment reference number
+  paymentDate    DateTime
+  amount         Float
+  paymentMethod  PaymentMethod @default(CHECK)
+  referenceNumber String? // Check number, wire confirmation, etc.
+  status         PaymentStatus @default(APPLIED)
+  notes          String?
+
+  // Integration tracking
+  sourceType     RecordSourceType @default(MANUAL)
+  externalSystem String?
+  externalId     String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organization           Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  project                Project?                @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  client                 Client?                 @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  user                   User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  productCategory        ProductCategory?        @relation(fields: [productCategoryId], references: [id], onDelete: SetNull)
-  parentTransaction      SalesTransaction?       @relation("Returns", fields: [parentTransactionId], references: [id])
-  returns                SalesTransaction[]      @relation("Returns")
-  commissionCalculations CommissionCalculation[]
-
-  @@unique([organizationId, externalId, externalSystem])
-  @@index([organizationId])
-  @@index([projectId])
-  @@index([clientId])
-  @@index([userId])
-  @@index([productCategoryId])
-  @@index([transactionType])
-  @@index([transactionDate])
-  @@map("sales_transactions")
-}
-
-model CommissionCalculation {
-  id                 String           @id @default(cuid())
-  salesTransactionId String
-  commissionPlanId   String
-  userId             String // Salesperson earning the commission
-  organizationId     String
-  amount             Float // Calculated commission amount
-  status             CommissionStatus @default(PENDING)
-  metadata           Json? // NEW: Store calculation details (applied rules, basis, context)
-  calculatedAt       DateTime         @default(now())
-  approvedAt         DateTime? // When the commission was approved
-  paidAt             DateTime? // When the commission was paid
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
-
-  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  salesTransaction SalesTransaction @relation(fields: [salesTransactionId], references: [id], onDelete: Cascade)
-  commissionPlan   CommissionPlan   @relation(fields: [commissionPlanId], references: [id], onDelete: Cascade)
-  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  payout           Payout?          @relation(fields: [payoutId], references: [id])
-  payoutId         String?
+  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer            Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  paymentApplications PaymentApplication[]
 
   @@index([organizationId])
-  @@index([salesTransactionId])
-  @@index([userId])
+  @@index([customerId])
+  @@index([paymentDate])
   @@index([status])
-  @@map("commission_calculations")
+  @@map("customer_payments")
 }
 
-model Payout {
-  id             String       @id @default(cuid())
-  userId         String // Salesperson receiving payout
+model PaymentApplication {
+  id           String   @id @default(cuid())
+  paymentId    String
+  arDocumentId String
+  amountApplied Float
+  createdAt    DateTime @default(now())
+
   organizationId String
-  amount         Float
-  status         PayoutStatus @default(PENDING)
-  paymentMethod  String?
-  paymentDate    DateTime?
-  notes          String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
 
-  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  commissions  CommissionCalculation[]
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  payment      CustomerPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  arDocument   ArDocument      @relation(fields: [arDocumentId], references: [id], onDelete: Cascade)
 
+  @@index([paymentId])
+  @@index([arDocumentId])
   @@index([organizationId])
-  @@index([userId])
-  @@index([status])
-  @@map("payouts")
+  @@map("payment_applications")
 }
+
+// ============================================
+// AUDIT LOG
+// ============================================
 
 model AuditLog {
   id        String   @id @default(cuid())
@@ -556,8 +387,8 @@ model AuditLog {
   userEmail String? // Cached for display
 
   // What action was performed
-  action     String // e.g. "commission_approved", "commission_paid", "bulk_payout"
-  entityType String // e.g. "commission", "sale", "plan"
+  action     String // e.g. "invoice_created", "payment_applied", "customer_updated"
+  entityType String // e.g. "invoice", "payment", "customer"
   entityId   String? // ID of the entity affected
 
   // Details
@@ -578,6 +409,7 @@ model AuditLog {
   @@index([action])
   @@index([entityType, entityId])
   @@index([createdAt])
+  @@map("audit_logs")
 }
 
 // ============================================
@@ -597,24 +429,24 @@ model AcumaticaIntegration {
   lastConnectionTest     DateTime?
   connectionErrorMessage String?
 
-  // NEW v2: Data Source Configuration
+  // Data Source Configuration
   dataSourceType     DataSourceType @default(REST_API)
   dataSourceEntity   String         @default("Invoice") // e.g., "Invoice", "SalesInvoice", or GI name
   dataSourceEndpoint String? // Full endpoint URL for queries
 
-  // NEW v2: Discovered Schema (cached)
+  // Discovered Schema (cached)
   discoveredSchema  Json? // Cached field schema from Acumatica
   schemaLastUpdated DateTime?
 
-  // NEW v2: Dynamic Field Mappings (replaces hardcoded enums)
-  fieldMappings Json? // FieldMappingConfig - required + optional + custom mappings
+  // Dynamic Field Mappings
+  fieldMappings Json? // Field mapping configuration
 
-  // NEW v2: Dynamic Filter Configuration (replaces individual filter fields)
-  filterConfig Json? // FilterConfig - status, date range, document types, branches
+  // Dynamic Filter Configuration
+  filterConfig Json? // Filter configuration
 
-  // NEW v2: Unmapped Salesperson Handling
-  unmappedSalespersonAction UnmappedAction @default(SKIP)
-  defaultSalespersonUserId  String?
+  // Unmapped Customer Handling
+  unmappedCustomerAction UnmappedAction @default(SKIP)
+  defaultCustomerUserId  String?
 
   // Sync Schedule
   syncFrequency     SyncFrequency @default(MANUAL)
@@ -623,64 +455,34 @@ model AcumaticaIntegration {
   lastSyncAt        DateTime?
   nextScheduledSync DateTime?
 
-  // DEPRECATED v1 Fields (kept for backward compatibility during migration)
-  // These will be migrated to fieldMappings and filterConfig JSON
-  invoiceStartDate DateTime? // DEPRECATED - moved to filterConfig.dateRange
-  invoiceEndDate   DateTime? // DEPRECATED - moved to filterConfig.dateRange
-
-  branchFilterMode BranchFilterMode? @default(ALL) // DEPRECATED - moved to filterConfig.branch
-  selectedBranches Json? // DEPRECATED - moved to filterConfig.branch
-
-  includeInvoices    Boolean? @default(true) // DEPRECATED - moved to filterConfig.documentType
-  includeCreditMemos Boolean? @default(false) // DEPRECATED - moved to filterConfig.documentType
-  includeDebitMemos  Boolean? @default(false) // DEPRECATED - moved to filterConfig.documentType
-
-  customerHandling CustomerHandling? @default(AUTO_CREATE) // DEPRECATED - moved to fieldMappings
-  customerIdSource CustomerIdSource? @default(CUSTOMER_CD) // DEPRECATED - moved to fieldMappings.customer
-
-  projectAutoCreate Boolean?           @default(true) // DEPRECATED - kept for now
-  noProjectHandling NoProjectHandling? @default(NO_PROJECT) // DEPRECATED - kept for now
-
-  importLevel        ImportLevel?        @default(INVOICE_TOTAL) // DEPRECATED - moved to fieldMappings
-  invoiceAmountField InvoiceAmountField? @default(AMOUNT) // DEPRECATED - moved to fieldMappings.amount
-  lineAmountField    LineAmountField?    @default(EXTENDED_PRICE) // DEPRECATED - moved to fieldMappings
-  lineFilterMode     LineFilterMode?     @default(ALL) // DEPRECATED - moved to filterConfig
-  lineFilterValues   Json? // DEPRECATED - moved to filterConfig
-
-  storeItemId          Boolean? @default(true) // DEPRECATED - kept for now
-  storeItemDescription Boolean? @default(true) // DEPRECATED - kept for now
-  storeItemClass       Boolean? @default(false) // DEPRECATED - kept for now
-  storeGLAccount       Boolean? @default(false) // DEPRECATED - kept for now
-  storeQtyAndPrice     Boolean? @default(false) // DEPRECATED - kept for now
-
   // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  organization        Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  salespersonMappings AcumaticaSalespersonMapping[]
-  syncLogs            IntegrationSyncLog[]
+  organization      Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customerMappings  AcumaticaCustomerMapping[]
+  syncLogs          IntegrationSyncLog[]
 
   @@index([organizationId])
   @@map("acumatica_integrations")
 }
 
-model AcumaticaSalespersonMapping {
+model AcumaticaCustomerMapping {
   id            String @id @default(cuid())
   integrationId String
 
   // Acumatica Data
-  acumaticaSalespersonId   String // Salesperson CD from Acumatica
-  acumaticaSalespersonName String
-  acumaticaEmail           String?
+  acumaticaCustomerId   String // Customer CD from Acumatica
+  acumaticaCustomerName String
+  acumaticaEmail        String?
 
   // Mapping Status
-  status    SalespersonMappingStatus @default(PENDING)
-  matchType SalespersonMatchType?
+  status    CustomerMappingStatus @default(PENDING)
+  matchType CustomerMatchType?
 
-  // CommissionFlow User (nullable until mapped)
-  userId String?
+  // ARFlow Customer (nullable until mapped)
+  customerId String?
 
   // Timestamps
   createdAt DateTime @default(now())
@@ -688,10 +490,10 @@ model AcumaticaSalespersonMapping {
 
   integration AcumaticaIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 
-  @@unique([integrationId, acumaticaSalespersonId])
+  @@unique([integrationId, acumaticaCustomerId])
   @@index([integrationId])
-  @@index([userId])
-  @@map("acumatica_salesperson_mappings")
+  @@index([customerId])
+  @@map("acumatica_customer_mappings")
 }
 
 model IntegrationSyncLog {
@@ -706,21 +508,20 @@ model IntegrationSyncLog {
   triggeredById String? // User ID if manual, null if scheduled
 
   // Counters
-  invoicesFetched   Int @default(0)
-  invoicesProcessed Int @default(0)
-  invoicesSkipped   Int @default(0)
-  salesCreated      Int @default(0)
-  clientsCreated    Int @default(0)
-  projectsCreated   Int @default(0)
-  errorsCount       Int @default(0)
+  invoicesFetched    Int @default(0)
+  invoicesProcessed  Int @default(0)
+  invoicesSkipped    Int @default(0)
+  documentsCreated   Int @default(0)
+  customersCreated   Int @default(0)
+  errorsCount        Int @default(0)
 
   // Detailed Results
   skipDetails    Json? // Array of {invoiceRef, reason}
   errorDetails   Json? // Array of {invoiceRef, error}
-  createdRecords Json? // Summary of created clients/projects
+  createdRecords Json? // Summary of created customers/documents
 
   // Timestamps
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   undoneAt  DateTime? // Timestamp when sync was undone
 
   integration AcumaticaIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)

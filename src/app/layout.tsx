@@ -15,8 +15,8 @@ import { prisma } from '@/lib/db'
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "CommissionFlow - AI-Powered Sales Commission Management",
-  description: "Simplify sales commission tracking, calculation, and payments with AI-powered tools for SMBs.",
+  title: "ARFlow - B2B Accounts Receivable Portal",
+  description: "Give your customers clarity on every invoice with a secure, self-service portal for viewing invoices and managing their account.",
 };
 
 export default async function RootLayout({
