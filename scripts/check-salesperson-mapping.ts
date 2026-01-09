@@ -8,6 +8,12 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
+  if (process.env.ENABLE_SALESPERSON_MAPPING_CHECK !== 'true') {
+    console.log('\n⚠️  Salesperson mapping check is temporarily disabled.\n');
+    console.log('Set ENABLE_SALESPERSON_MAPPING_CHECK=true to re-enable.\n');
+    return;
+  }
+
   const salespersonId = process.argv[2] || 'SP0010';
 
   console.log(`\n🔍 Checking salesperson mapping for: "${salespersonId}"\n`);
