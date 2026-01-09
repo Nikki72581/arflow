@@ -37,70 +37,31 @@ A modern B2B Accounts Receivable portal built with Next.js. Give your customers 
 - **Email**: [Resend](https://resend.com/)
 - **Testing**: [Vitest](https://vitest.dev/) + [Playwright](https://playwright.dev/)
 
-## Getting Started
+## Quick Start
 
-### Prerequisites
+Get up and running in 5 minutes:
 
-- Node.js 18+ and npm/yarn/pnpm
-- PostgreSQL database
-- Clerk account for authentication
-- Resend account for email notifications (optional)
-
-### Installation
-
-1. Clone the repository:
 ```bash
+# Clone and install
 git clone https://github.com/Nikki72581/arflow
 cd arflow
-```
-
-2. Install dependencies:
-```bash
 npm install
-```
 
-3. Set up environment variables:
-```bash
+# Configure environment
 cp .env.example .env.local
-```
+# Edit .env.local with your credentials
 
-Required environment variables:
-```env
-# Database
-DATABASE_URL="postgresql://..."
-
-# Clerk Authentication
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_..."
-CLERK_SECRET_KEY="sk_..."
-NEXT_PUBLIC_CLERK_SIGN_IN_URL="/sign-in"
-NEXT_PUBLIC_CLERK_SIGN_UP_URL="/sign-up"
-
-# Resend (for email notifications)
-RESEND_API_KEY="re_..."
-RESEND_FROM_EMAIL="noreply@yourdomain.com"
-
-# Application
-COMPANY_NAME="Your Company Name"
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-```
-
-4. Set up the database:
-```bash
+# Set up database
 npx prisma generate
 npx prisma db push
-```
 
-5. Seed demo data (optional):
-```bash
-npm run db:seed
-```
-
-6. Start the development server:
-```bash
+# Start development server
 npm run dev
 ```
 
-7. Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+**For detailed setup instructions**, see [docs/setup/installation.md](docs/setup/installation.md).
 
 ## Project Structure
 
@@ -184,23 +145,33 @@ All data is automatically scoped to organizations:
 - Users can belong to multiple organizations
 - Automatic filtering in all queries
 
-## Troubleshooting
+## Documentation
 
-### Database Connection Issues
-- Verify `DATABASE_URL` is correctly set in `.env.local`
-- Ensure PostgreSQL is running
-- Run `npx prisma db push` to sync schema
+Comprehensive guides are available in the `docs/` directory:
 
-### Authentication Issues
-- Check Clerk API keys are correct
-- Verify user has been assigned to an organization
-- Clear cookies and sign in again
+### Setup Guides
+- [Installation Guide](docs/setup/installation.md) - Complete setup instructions
+- [Acumatica Integration](docs/setup/acumatica-integration.md) - ERP integration setup
+- [Email Setup](docs/setup/email-setup.md) - Configure email notifications
+- [Team Setup](docs/setup/team-setup.md) - Multi-user and organization configuration
 
-### Missing UI Components
-Install required shadcn/ui components:
-```bash
-npx shadcn-ui@latest add button card input label table badge dialog
-```
+### Development Guides
+- [Development Workflow](docs/guides/development.md) - Git workflow and best practices
+- [Testing Guide](docs/guides/testing.md) - Unit, integration, and E2E testing
+- [Deployment Guide](docs/guides/deployment.md) - Deploy to Vercel
+- [Integration Guide](docs/guides/integration.md) - API integrations
+
+### Reference
+- [File Structure](docs/reference/file-structure.md) - Project organization
+- [Test IDs Guide](docs/reference/test-ids.md) - E2E testing selectors
+- [Troubleshooting](docs/reference/troubleshooting.md) - Common issues and solutions
+
+## Quick Links
+
+- **Getting Started**: [docs/setup/installation.md](docs/setup/installation.md)
+- **Deploy to Production**: [docs/guides/deployment.md](docs/guides/deployment.md)
+- **Run Tests**: [docs/guides/testing.md](docs/guides/testing.md)
+- **Common Issues**: [docs/reference/troubleshooting.md](docs/reference/troubleshooting.md)
 
 ## Contributing
 
@@ -212,4 +183,7 @@ Proprietary - All rights reserved.
 
 ## Support
 
-For questions or issues, please create an issue in the [GitHub repository](https://github.com/Nikki72581/arflow/issues).
+For questions or issues:
+- Check [docs/reference/troubleshooting.md](docs/reference/troubleshooting.md)
+- Review documentation in [docs/](docs/)
+- Create an issue in the [GitHub repository](https://github.com/Nikki72581/arflow/issues)

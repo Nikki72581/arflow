@@ -1,64 +1,77 @@
-# ARFlow Transformation Documentation
+# ARFlow Documentation
 
-This directory contains all documentation for the CommissionFlow → ARFlow transformation.
+Welcome to the ARFlow documentation! This directory contains all guides and references for developing, deploying, and maintaining ARFlow.
 
-## 📚 Documents
+## Documentation Structure
 
-1. **[TRANSFORMATION_PLAN.md](./TRANSFORMATION_PLAN.md)** - Master plan
-   - Complete overview of the transformation
-   - Vision and decision points
-   - All 6 phases detailed
-   - What to keep vs. what to change
+### 📦 [Setup](./setup/)
+Guides for initial installation and configuration:
+- [Installation Guide](./setup/installation.md) - Get ARFlow running locally
+- [Acumatica Integration](./setup/acumatica-integration.md) - Connect to Acumatica ERP
+- [Email Setup](./setup/email-setup.md) - Configure Resend for notifications
+- [Team Setup](./setup/team-setup.md) - Manage organizations and users
 
-2. **[TRANSFORMATION_STATUS.md](./TRANSFORMATION_STATUS.md)** - Current status
-   - What's been completed
-   - Current build status
-   - Next steps
-   - Files modified/removed
+### 📘 [Guides](./guides/)
+Step-by-step development and deployment guides:
+- [Development Workflow](./guides/development.md) - Git workflow and daily development
+- [Testing Guide](./guides/testing.md) - Unit, integration, and E2E testing
+- [Deployment Guide](./guides/deployment.md) - Deploy to Vercel production
+- [Integration Guide](./guides/integration.md) - Integrating with external services
 
-3. **[PHASE_1_CHECKLIST.md](./PHASE_1_CHECKLIST.md)** - Current phase details
-   - Detailed checklist for Phase 1 (Global Renaming)
-   - Step-by-step tasks
-   - Testing instructions
+### 📚 [Reference](./reference/)
+Quick reference documentation:
+- [File Structure](./reference/file-structure.md) - Project organization and architecture
+- [Test IDs Guide](./reference/test-ids.md) - E2E testing data-testid reference
+- [Troubleshooting](./reference/troubleshooting.md) - Common issues and solutions
 
-## 🎯 Current Status
+### 📁 [Archive](./archive/)
+Legacy documentation kept for historical reference. These docs may be outdated.
 
-**Phase:** Phase 1 - Global Renaming & Cleanup (COMPLETED ✅)
-**Build Status:** ⚠️ Broken (expected)
-**Last Updated:** January 9, 2025
+## Quick Start
 
-## 🚀 Quick Start (Resuming Work)
+New to ARFlow? Start here:
 
-If you or Claude need to resume this work:
+1. **[Installation Guide](./setup/installation.md)** - Get up and running in 5 minutes
+2. **[Development Workflow](./guides/development.md)** - Learn the development process
+3. **[Testing Guide](./guides/testing.md)** - Run and write tests
+4. **[Deployment Guide](./guides/deployment.md)** - Deploy to production
 
-1. Read [TRANSFORMATION_STATUS.md](./TRANSFORMATION_STATUS.md) to see what's done
-2. Open [PHASE_1_CHECKLIST.md](./PHASE_1_CHECKLIST.md) to see current tasks
-3. Start checking off items in the checklist
-4. Update TRANSFORMATION_STATUS.md as you complete sections
+## Common Tasks
 
-## 📝 Phase Overview
+- **Setting up a new development environment**: [Installation Guide](./setup/installation.md)
+- **Running tests**: [Testing Guide](./guides/testing.md)
+- **Deploying to Vercel**: [Deployment Guide](./guides/deployment.md)
+- **Configuring email notifications**: [Email Setup](./setup/email-setup.md)
+- **Integrating with Acumatica**: [Acumatica Integration](./setup/acumatica-integration.md)
+- **Troubleshooting issues**: [Troubleshooting Reference](./reference/troubleshooting.md)
 
-- ✅ **Phase 0:** Initial setup & planning (DONE)
-- ✅ **Phase 1:** Global Renaming & Cleanup (DONE)
-- 🔄 **Phase 2:** Database Schema Changes (CURRENT)
-- ⏳ **Phase 3:** Folder & Component Restructuring
-- ⏳ **Phase 4:** UI Content Changes
-- ⏳ **Phase 5:** Authentication & Roles
-- ⏳ **Phase 6:** Data Import
+## Getting Help
 
-## 💡 Key Principles
+If you can't find what you're looking for:
 
-1. **Methodical > Fast** - Work phase by phase, don't skip ahead
-2. **Document Progress** - Update TRANSFORMATION_STATUS.md frequently
-3. **Test Often** - Verify changes don't break existing functionality
-4. **Commit Frequently** - Small, focused commits per section
+1. Check the [Troubleshooting Guide](./reference/troubleshooting.md)
+2. Search this documentation directory
+3. Create an issue in the [GitHub repository](https://github.com/Nikki72581/arflow/issues)
 
-## 🔗 Related Files
+## Contributing to Documentation
 
-- `prisma/schema.prisma` - Already converted to ARFlow schema
-- `scripts/check-customer-mapping.ts` - Updated salesperson → customer script
-- `src/app/dashboard/integrations/page.tsx` - Sample of updated UI
+When adding new features or making changes:
 
-## 📧 Questions?
+1. Update relevant documentation
+2. Add new guides if necessary
+3. Keep examples up to date
+4. Test all code examples
+5. Update the main [README.md](../README.md) if needed
 
-Refer back to the master plan in TRANSFORMATION_PLAN.md. It contains all the context and decision-making from the initial planning session.
+## Documentation Standards
+
+- Use clear, concise language
+- Include code examples
+- Provide step-by-step instructions
+- Add troubleshooting sections
+- Keep content up to date
+- Link between related docs
+
+## Questions?
+
+Contact the repository owner or open an issue for documentation improvements.
