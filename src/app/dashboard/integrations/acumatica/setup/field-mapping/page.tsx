@@ -354,20 +354,20 @@ export default function FieldMappingPage() {
             placeholder="Select date field..."
           />
 
-          {/* Salesperson */}
+          {/* Customer Mapping */}
           <div className="space-y-3">
             <FieldSelector
-              label="Salesperson Identifier"
-              description="Links the sale to a ARFlow user"
+              label="Customer Identifier (Acumatica Salesperson)"
+              description="Maps Acumatica salesperson field to ARFlow customer"
               required
               value={salespersonField}
               onChange={setSalespersonField}
               fields={fieldsByType.string}
-              placeholder="Select salesperson field..."
+              placeholder="Select Acumatica salesperson field..."
             />
 
             <div className="pl-6 space-y-2">
-              <Label className="text-sm font-normal">Salesperson Location</Label>
+              <Label className="text-sm font-normal">Field Location</Label>
               <RadioGroup
                 value={salespersonLevel}
                 onValueChange={(v) => setSalespersonLevel(v as any)}
@@ -376,7 +376,7 @@ export default function FieldMappingPage() {
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="header" id="sp-header" />
                   <Label htmlFor="sp-header" className="font-normal cursor-pointer">
-                    Invoice Header (one salesperson per invoice)
+                    Invoice Header (one value per invoice)
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2 opacity-50">

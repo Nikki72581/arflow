@@ -29,7 +29,7 @@ interface CreateClientInput {
 }
 
 /**
- * Create a new customer (client in CommissionFlow terms)
+ * Create a new customer
  */
 export async function createClient(input: CreateClientInput) {
   try {

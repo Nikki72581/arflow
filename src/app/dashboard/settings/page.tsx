@@ -7,9 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { updateUserProfile, getUserProfile, updateNotificationPreferences, getOrganizationSettings, updateOrganizationSettings, updateThemePreference } from '@/app/actions/settings'
-import { User, Bell, Shield, Loader2, ShoppingCart, MapPin, Award, ChevronRight, Settings, FolderKanban, Palette, Sun, Moon, Monitor } from 'lucide-react'
-import { Switch } from '@/components/ui/switch'
+import { updateUserProfile, getUserProfile, updateNotificationPreferences, updateThemePreference } from '@/app/actions/settings'
+import { User, Bell, Shield, Loader2, ShoppingCart, MapPin, ChevronRight, Settings, Palette, Sun, Moon, Monitor } from 'lucide-react'
 import { useTheme } from '@/components/providers/theme-provider'
 import Link from 'next/link'
 
@@ -19,11 +18,10 @@ interface UserProfile {
   firstName: string | null
   lastName: string | null
   role: string
-  createdAt: Date
   emailNotifications: boolean
-  salesAlerts: boolean
-  commissionAlerts: boolean
-  weeklyReports: boolean
+  invoiceAlerts: boolean
+  paymentAlerts: boolean
+  statementAlerts: boolean
   themePreference: string
 }
 
@@ -43,12 +41,11 @@ export default function SettingsPage() {
 
   // Notification preferences
   const [emailNotifications, setEmailNotifications] = useState(true)
-  const [salesAlerts, setSalesAlerts] = useState(true)
-  const [commissionAlerts, setCommissionAlerts] = useState(true)
-  const [weeklyReports, setWeeklyReports] = useState(false)
+  const [invoiceAlerts, setInvoiceAlerts] = useState(true)
+  const [paymentAlerts, setPaymentAlerts] = useState(true)
+  const [statementAlerts, setStatementAlerts] = useState(false)
 
   // Organization settings
-  const [requireProjects, setRequireProjects] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
 
   // Load user profile
@@ -56,10 +53,7 @@ export default function SettingsPage() {
     async function loadProfile() {
       try {
         setLoading(true)
-        const [profileResult, orgResult] = await Promise.all([
-          getUserProfile(),
-          getOrganizationSettings()
-        ])
+        const profileResult = await getUserProfile()
 
         if (profileResult.success && profileResult.data) {
           setProfile(profileResult.data)
@@ -67,16 +61,12 @@ export default function SettingsPage() {
           setLastName(profileResult.data.lastName || '')
           setEmail(profileResult.data.email)
           setEmailNotifications(profileResult.data.emailNotifications)
-          setSalesAlerts(profileResult.data.salesAlerts)
-          setCommissionAlerts(profileResult.data.commissionAlerts)
-          setWeeklyReports(profileResult.data.weeklyReports)
+          setInvoiceAlerts(profileResult.data.invoiceAlerts)
+          setPaymentAlerts(profileResult.data.paymentAlerts)
+          setStatementAlerts(profileResult.data.statementAlerts)
           setIsAdmin(profileResult.data.role === 'ADMIN')
         } else {
           setError(profileResult.error || 'Failed to load profile')
-        }
-
-        if (orgResult.success && orgResult.data) {
-          setRequireProjects(orgResult.data.requireProjects)
         }
       } catch (err) {
         setError('An unexpected error occurred')
@@ -98,7 +88,6 @@ export default function SettingsPage() {
       const result = await updateUserProfile({
         firstName: firstName || undefined,
         lastName: lastName || undefined,
-        email: email || undefined,
       })
 
       if (result.success) {
@@ -122,9 +111,9 @@ export default function SettingsPage() {
     try {
       const result = await updateNotificationPreferences({
         emailNotifications,
-        salesAlerts,
-        commissionAlerts,
-        weeklyReports,
+        invoiceAlerts,
+        paymentAlerts,
+        statementAlerts,
       })
 
       if (result.success) {
@@ -140,29 +129,6 @@ export default function SettingsPage() {
     }
   }
 
-  async function handleOrganizationSettingsUpdate(newRequireProjects: boolean) {
-    setError(null)
-    setSuccess(null)
-    setSaving(true)
-
-    try {
-      const result = await updateOrganizationSettings({
-        requireProjects: newRequireProjects,
-      })
-
-      if (result.success) {
-        setRequireProjects(newRequireProjects)
-        setSuccess('Organization settings updated successfully')
-        router.refresh()
-      } else {
-        setError(result.error || 'Failed to update organization settings')
-      }
-    } catch (err) {
-      setError('An unexpected error occurred')
-    } finally {
-      setSaving(false)
-    }
-  }
 
   async function handleThemeChange(newTheme: 'light' | 'dark' | 'system') {
     setError(null)
@@ -170,7 +136,7 @@ export default function SettingsPage() {
     setTheme(newTheme)
 
     try {
-      const result = await updateThemePreference({ themePreference: newTheme })
+      const result = await updateThemePreference(newTheme)
 
       if (result.success) {
         setSuccess('Theme preference updated successfully')
@@ -222,26 +188,6 @@ export default function SettingsPage() {
           {/* Project Settings - Admin Only */}
           {isAdmin && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
-                <div className="space-y-1 flex-1">
-                  <div className="flex items-center gap-2">
-                    <FolderKanban className="h-5 w-5 text-primary" />
-                    <Label htmlFor="requireProjects" className="font-semibold">Require Projects for Sales</Label>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    When enabled, all sales transactions must be associated with a project. When disabled, sales can be created without selecting a project.
-                  </p>
-                </div>
-                <Switch
-                  id="requireProjects"
-                  checked={requireProjects}
-                  onCheckedChange={handleOrganizationSettingsUpdate}
-                  disabled={saving}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground px-1">
-                This setting only affects new sales transactions. Existing sales will retain their project associations.
-              </p>
             </div>
           )}
 
@@ -288,25 +234,6 @@ export default function SettingsPage() {
               </Card>
             </Link>
 
-            {/* Customer Tiers */}
-            <Link href="/dashboard/settings/customer-tiers">
-              <Card className="cursor-pointer transition-all hover:shadow-md border-2 hover:border-primary/50">
-                <CardContent className="pt-6">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2 flex-1">
-                      <div className="flex items-center gap-2">
-                        <Award className="h-5 w-5 text-purple-600" />
-                        <h3 className="font-semibold">Customer Tiers</h3>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        View tier definitions: STANDARD, VIP, NEW, and ENTERPRISE
-                      </p>
-                    </div>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
           </div>
         </CardContent>
       </Card>
@@ -374,7 +301,7 @@ export default function SettingsPage() {
               <Label>Role</Label>
               <div className="flex items-center h-9 px-3 py-2 rounded-md border bg-muted/50">
                 <span className="text-sm font-medium">
-                  {profile?.role === 'ADMIN' ? 'Administrator' : 'Salesperson'}
+                  {profile?.role === 'ADMIN' ? 'Administrator' : 'Customer'}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
@@ -521,16 +448,16 @@ export default function SettingsPage() {
 
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label htmlFor="salesAlerts">Sales Alerts</Label>
+              <Label htmlFor="invoiceAlerts">Invoice Alerts</Label>
               <p className="text-sm text-muted-foreground">
-                Get notified when new sales are recorded
+                Get notified when new invoices are created
               </p>
             </div>
             <input
               type="checkbox"
-              id="salesAlerts"
-              checked={salesAlerts}
-              onChange={(e) => setSalesAlerts(e.target.checked)}
+              id="invoiceAlerts"
+              checked={invoiceAlerts}
+              onChange={(e) => setInvoiceAlerts(e.target.checked)}
               className="h-4 w-4 rounded border-input cursor-pointer"
             />
           </div>
@@ -539,16 +466,16 @@ export default function SettingsPage() {
 
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label htmlFor="commissionAlerts">Commission Alerts</Label>
+              <Label htmlFor="paymentAlerts">Payment Alerts</Label>
               <p className="text-sm text-muted-foreground">
-                Get notified about commission calculations and payouts
+                Get notified about payment applications and updates
               </p>
             </div>
             <input
               type="checkbox"
-              id="commissionAlerts"
-              checked={commissionAlerts}
-              onChange={(e) => setCommissionAlerts(e.target.checked)}
+              id="paymentAlerts"
+              checked={paymentAlerts}
+              onChange={(e) => setPaymentAlerts(e.target.checked)}
               className="h-4 w-4 rounded border-input cursor-pointer"
             />
           </div>
@@ -557,16 +484,16 @@ export default function SettingsPage() {
 
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label htmlFor="weeklyReports">Weekly Reports</Label>
+              <Label htmlFor="statementAlerts">Statement Alerts</Label>
               <p className="text-sm text-muted-foreground">
-                Receive weekly performance summaries
+                Receive monthly account statements
               </p>
             </div>
             <input
               type="checkbox"
-              id="weeklyReports"
-              checked={weeklyReports}
-              onChange={(e) => setWeeklyReports(e.target.checked)}
+              id="statementAlerts"
+              checked={statementAlerts}
+              onChange={(e) => setStatementAlerts(e.target.checked)}
               className="h-4 w-4 rounded border-input cursor-pointer"
             />
           </div>
@@ -627,15 +554,9 @@ export default function SettingsPage() {
           <Separator className="bg-indigo-500/20" />
 
           <div className="space-y-2">
-            <Label>Account Created</Label>
+            <Label>Role</Label>
             <p className="text-sm text-muted-foreground">
-              {profile?.createdAt
-                ? new Date(profile.createdAt).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })
-                : 'N/A'}
+              {profile?.role === 'ADMIN' ? 'Administrator' : 'Customer'}
             </p>
           </div>
         </CardContent>
