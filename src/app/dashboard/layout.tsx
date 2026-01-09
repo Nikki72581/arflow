@@ -14,14 +14,15 @@ export default async function DashboardLayout({
   // Use auth helper that ensures user has completed onboarding
   const user = await getCurrentUserWithOrg()
 
-  // Get pending count for badges
-  // Admins see all pending approvals in org, salespeople see only their own
-  const pendingCount = await prisma.commissionCalculation.count({
+  // Get open/overdue invoice count for badges
+  // Admins see all invoices in org, customers see only their own
+  const pendingCount = await prisma.arDocument.count({
     where: {
-      status: 'PENDING',
-      ...(user.role === 'ADMIN'
-        ? { user: { organizationId: user.organizationId } }
-        : { user: { clerkId: user.clerkId } }),
+      status: 'OPEN',
+      organizationId: user.organizationId,
+      ...(user.role === 'CUSTOMER' && user.customerId
+        ? { customerId: user.customerId }
+        : {}),
     },
   })
 
@@ -37,7 +38,7 @@ export default async function DashboardLayout({
       <EnhancedHeader
         userName={userName}
         userEmail={userEmail}
-        userRole={userRole as 'ADMIN' | 'SALESPERSON'}
+        userRole={userRole as 'ADMIN' | 'CUSTOMER'}
         organizationName={organizationName}
         organizationSlug={organizationSlug}
         notificationCount={pendingCount}
@@ -47,7 +48,7 @@ export default async function DashboardLayout({
         {/* Desktop Sidebar - Now sticky and fixed height */}
         <aside className="hidden border-r md:block md:sticky md:top-0 md:h-[calc(100vh-4rem)] md:overflow-y-auto transition-all duration-300 ease-in-out">
           <SidebarWrapper
-            userRole={userRole as 'ADMIN' | 'SALESPERSON'}
+            userRole={userRole as 'ADMIN' | 'CUSTOMER'}
             pendingCount={pendingCount}
             userName={userName}
             organizationName={organizationName}
@@ -64,7 +65,7 @@ export default async function DashboardLayout({
 
       {/* Mobile Bottom Navigation */}
       <MobileBottomNav
-        userRole={userRole as 'ADMIN' | 'SALESPERSON'}
+        userRole={userRole as 'ADMIN' | 'CUSTOMER'}
         pendingCount={pendingCount}
       />
     </div>
