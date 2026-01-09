@@ -3,7 +3,7 @@ import { auth } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/db'
 
 type SearchResult = {
-  type: 'client' | 'project' | 'sale' | 'commission' | 'plan' | 'team' | 'payout'
+  type: 'client' | 'invoice' | 'payment' | 'team'
   id: string
   title: string
   subtitle?: string
@@ -50,23 +50,27 @@ export async function GET(request: NextRequest) {
     const orgId = user.organizationId
     const results: SearchResult[] = []
 
-    // Search Clients
-    const clients = await prisma.client.findMany({
+    // Search Customers
+    const clients = await prisma.customer.findMany({
       where: {
         organizationId: orgId,
         OR: [
-          { name: { contains: query, mode: 'insensitive' } },
+          { companyName: { contains: query, mode: 'insensitive' } },
+          { contactName: { contains: query, mode: 'insensitive' } },
+          { customerNumber: { contains: query, mode: 'insensitive' } },
           { email: { contains: query, mode: 'insensitive' } }
         ]
       },
       take: 10,
       select: {
         id: true,
-        name: true,
+        companyName: true,
+        contactName: true,
         email: true,
         phone: true,
+        currentBalance: true,
         _count: {
-          select: { projects: true }
+          select: { arDocuments: true }
         }
       }
     })
@@ -75,119 +79,89 @@ export async function GET(request: NextRequest) {
       results.push({
         type: 'client',
         id: client.id,
-        title: client.name,
-        subtitle: client.email || undefined,
+        title: client.companyName,
+        subtitle: client.contactName || client.email || undefined,
         metadata: {
-          projects: `${client._count.projects} project${client._count.projects !== 1 ? 's' : ''}`,
+          invoices: `${client._count.arDocuments} invoice${client._count.arDocuments !== 1 ? 's' : ''}`,
+          balance: `$${client.currentBalance.toLocaleString()}`,
           ...(client.phone ? { phone: client.phone } : {})
         },
         href: `/dashboard/clients/${client.id}`
       })
     })
 
-    // Search Projects
-    const projects = await prisma.project.findMany({
+    // Search Invoices
+    const invoices = await prisma.arDocument.findMany({
       where: {
         organizationId: orgId,
         OR: [
-          { name: { contains: query, mode: 'insensitive' } },
+          { documentNumber: { contains: query, mode: 'insensitive' } },
           { description: { contains: query, mode: 'insensitive' } },
-          { client: { name: { contains: query, mode: 'insensitive' } } }
+          { customer: { companyName: { contains: query, mode: 'insensitive' } } }
         ]
       },
       take: 10,
       include: {
-        client: {
-          select: { name: true }
+        customer: {
+          select: { companyName: true }
         }
       }
     })
 
-    projects.forEach(project => {
+    invoices.forEach(invoice => {
+      const invoiceTitle = invoice.documentNumber
+        ? `Invoice ${invoice.documentNumber}`
+        : `Invoice ${invoice.id.slice(0, 8)}`
       results.push({
-        type: 'project',
-        id: project.id,
-        title: project.name,
-        subtitle: project.client.name,
-        description: project.description || undefined,
+        type: 'invoice',
+        id: invoice.id,
+        title: invoiceTitle,
+        subtitle: invoice.customer.companyName,
+        description: invoice.description || undefined,
         metadata: {
-          status: project.status.toLowerCase()
+          amount: `$${invoice.totalAmount.toLocaleString()}`,
+          status: invoice.status.toLowerCase(),
+          date: new Date(invoice.documentDate).toLocaleDateString()
         },
-        href: `/dashboard/projects?client=${project.clientId}`
+        href: `/dashboard/clients/${invoice.customerId}`
       })
     })
 
-    // Search Sales Transactions
-    const sales = await prisma.salesTransaction.findMany({
+    // Search Payments
+    const payments = await prisma.customerPayment.findMany({
       where: {
         organizationId: orgId,
         OR: [
-          { description: { contains: query, mode: 'insensitive' } },
-          { invoiceNumber: { contains: query, mode: 'insensitive' } },
-          { project: { name: { contains: query, mode: 'insensitive' } } },
-          { project: { client: { name: { contains: query, mode: 'insensitive' } } } },
-          { user: { firstName: { contains: query, mode: 'insensitive' } } },
-          { user: { lastName: { contains: query, mode: 'insensitive' } } }
+          { paymentNumber: { contains: query, mode: 'insensitive' } },
+          { referenceNumber: { contains: query, mode: 'insensitive' } },
+          { customer: { companyName: { contains: query, mode: 'insensitive' } } }
         ]
       },
       take: 10,
       include: {
-        project: {
-          include: {
-            client: {
-              select: { name: true }
-            }
-          }
-        },
-        user: {
+        customer: {
           select: {
-            firstName: true,
-            lastName: true
+            companyName: true
           }
         }
       }
     })
 
-    sales.forEach(sale => {
-      const salespersonName = `${sale.user.firstName} ${sale.user.lastName}`
-      const clientName = sale.project?.client.name || 'No Client'
-      const projectName = sale.project?.name || 'No Project'
+    payments.forEach(payment => {
+      const paymentTitle = payment.paymentNumber
+        ? `Payment ${payment.paymentNumber}`
+        : `Payment ${payment.id.slice(0, 8)}`
       results.push({
-        type: 'sale',
-        id: sale.id,
-        title: sale.description || `Sale #${sale.invoiceNumber || sale.id.slice(0, 8)}`,
-        subtitle: `${clientName} - ${projectName}`,
+        type: 'payment',
+        id: payment.id,
+        title: paymentTitle,
+        subtitle: payment.customer.companyName,
         metadata: {
-          amount: `$${sale.amount.toLocaleString()}`,
-          salesperson: salespersonName,
-          date: new Date(sale.transactionDate).toLocaleDateString()
+          amount: `$${payment.amount.toLocaleString()}`,
+          status: payment.status.toLowerCase(),
+          date: new Date(payment.paymentDate).toLocaleDateString()
         },
-        href: `/dashboard/sales`
-      })
-    })
-
-    // Search Commission Plans
-    const plans = await prisma.commissionPlan.findMany({
-      where: {
-        organizationId: orgId,
-        OR: [
-          { name: { contains: query, mode: 'insensitive' } },
-          { description: { contains: query, mode: 'insensitive' } }
-        ]
-      },
-      take: 10
-    })
-
-    plans.forEach(plan => {
-      results.push({
-        type: 'plan',
-        id: plan.id,
-        title: plan.name,
-        description: plan.description || undefined,
-        metadata: {
-          status: plan.isActive ? 'active' : 'inactive'
-        },
-        href: `/dashboard/plans/${plan.id}`
+        href: `/dashboard/clients/${payment.customerId}`
       })
     })
 
@@ -221,95 +195,6 @@ export async function GET(request: NextRequest) {
           role: member.role.toLowerCase()
         },
         href: `/dashboard/team`
-      })
-    })
-
-    // Search Commissions
-    const commissions = await prisma.commissionCalculation.findMany({
-      where: {
-        organizationId: orgId,
-        OR: [
-          { user: { firstName: { contains: query, mode: 'insensitive' } } },
-          { user: { lastName: { contains: query, mode: 'insensitive' } } },
-          { salesTransaction: { project: { name: { contains: query, mode: 'insensitive' } } } },
-          { salesTransaction: { project: { client: { name: { contains: query, mode: 'insensitive' } } } } },
-          { commissionPlan: { name: { contains: query, mode: 'insensitive' } } }
-        ]
-      },
-      take: 10,
-      include: {
-        user: {
-          select: {
-            firstName: true,
-            lastName: true
-          }
-        },
-        salesTransaction: {
-          include: {
-            project: {
-              include: {
-                client: {
-                  select: { name: true }
-                }
-              }
-            }
-          }
-        },
-        commissionPlan: {
-          select: { name: true }
-        }
-      }
-    })
-
-    commissions.forEach(commission => {
-      const salespersonName = `${commission.user.firstName} ${commission.user.lastName}`
-      const clientName = commission.salesTransaction.project?.client.name || 'No Client'
-      const projectName = commission.salesTransaction.project?.name || 'No Project'
-      results.push({
-        type: 'commission',
-        id: commission.id,
-        title: `${salespersonName} - $${commission.amount.toLocaleString()}`,
-        subtitle: `${clientName} - ${projectName}`,
-        metadata: {
-          plan: commission.commissionPlan.name,
-          status: commission.status.toLowerCase()
-        },
-        href: `/dashboard/commissions`
-      })
-    })
-
-    // Search Payouts
-    const payouts = await prisma.payout.findMany({
-      where: {
-        organizationId: orgId,
-        OR: [
-          { user: { firstName: { contains: query, mode: 'insensitive' } } },
-          { user: { lastName: { contains: query, mode: 'insensitive' } } }
-        ]
-      },
-      take: 10,
-      include: {
-        user: {
-          select: {
-            firstName: true,
-            lastName: true
-          }
-        }
-      }
-    })
-
-    payouts.forEach(payout => {
-      const recipientName = `${payout.user.firstName} ${payout.user.lastName}`
-      results.push({
-        type: 'payout',
-        id: payout.id,
-        title: `Payout to ${recipientName}`,
-        subtitle: `$${payout.amount.toLocaleString()}`,
-        metadata: {
-          status: payout.status.toLowerCase(),
-          date: payout.paymentDate ? new Date(payout.paymentDate).toLocaleDateString() : 'Pending'
-        },
-        href: `/dashboard/commissions/payouts`
       })
     })
 

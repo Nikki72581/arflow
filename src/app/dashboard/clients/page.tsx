@@ -3,7 +3,6 @@ import { Plus, Users, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { EmptyState } from '@/components/ui/empty-state'
 import { getClients } from '@/app/actions/clients'
-import { getTerritories } from '@/app/actions/territories'
 import { ClientFormDialog } from '@/components/clients/client-form-dialog'
 import { ClientsTableWrapper } from '@/components/clients/clients-table-wrapper'
 export const dynamic = 'force-dynamic'
@@ -13,10 +12,7 @@ export const metadata = {
 }
 
 async function ClientsTable({ searchQuery }: { searchQuery?: string }) {
-  const [clientsResult, territoriesResult] = await Promise.all([
-    getClients(),
-    getTerritories(),
-  ])
+  const clientsResult = await getClients()
 
   if (!clientsResult.success) {
     return (
@@ -27,14 +23,13 @@ async function ClientsTable({ searchQuery }: { searchQuery?: string }) {
   }
 
   let clients = clientsResult.data || []
-  const territories = territoriesResult.success ? territoriesResult.data || [] : []
 
 // Filter by search query
 if (searchQuery && clients.length > 0) {
   const query = searchQuery.toLowerCase()
   clients = clients.filter(
     (client) =>
-      client.name.toLowerCase().includes(query) ||
+      client.companyName.toLowerCase().includes(query) ||
       client.email?.toLowerCase().includes(query)
   )
 }
@@ -63,7 +58,7 @@ if (searchQuery && clients.length > 0) {
     )
   }
 
-  return <ClientsTableWrapper clients={clients} territories={territories} />
+  return <ClientsTableWrapper clients={clients} />
 }
 
 function ClientsTableSkeleton() {
@@ -79,8 +74,6 @@ export default async function ClientsPage({
 }: {
   searchParams: { search?: string; create?: string }
 }) {
-  const territoriesResult = await getTerritories()
-  const territories = territoriesResult.success ? territoriesResult.data || [] : []
   const clientsResult = await getClients()
   const clients = clientsResult.success ? clientsResult.data || [] : []
 
@@ -89,9 +82,7 @@ export default async function ClientsPage({
     const status = ((client as any).status ?? 'ACTIVE').toString().toLowerCase()
     return status === 'active'
   }).length
-  const activeProjects = clients.reduce((sum, c) =>
-    sum + c.projects.filter((p: any) => p.status === 'active').length, 0
-  )
+  const totalInvoices = clients.reduce((sum, client) => sum + (client._count?.arDocuments ?? 0), 0)
 
   const openCreateDialog = searchParams.create === '1' || searchParams.create === 'true'
 
@@ -101,10 +92,10 @@ export default async function ClientsPage({
         <div>
           <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-purple-600 to-purple-500 bg-clip-text text-transparent">Clients</h1>
           <p className="text-muted-foreground">
-            Manage your clients and their projects
+            Manage your clients and their invoices
           </p>
         </div>
-        <ClientFormDialog territories={territories} defaultOpen={openCreateDialog} />
+        <ClientFormDialog defaultOpen={openCreateDialog} />
       </div>
 
       {/* Stats Cards */}
@@ -139,8 +130,8 @@ export default async function ClientsPage({
               <Plus className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Total Projects</p>
-              <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{activeProjects}</p>
+              <p className="text-sm font-medium text-muted-foreground">Total Invoices</p>
+              <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{totalInvoices}</p>
             </div>
           </div>
         </div>

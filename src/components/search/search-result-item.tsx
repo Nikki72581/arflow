@@ -1,17 +1,9 @@
 import Link from 'next/link'
-import {
-  Users,
-  FolderKanban,
-  DollarSign,
-  Calculator,
-  FileText,
-  User,
-  Wallet
-} from 'lucide-react'
+import { Users, FileText, User, Wallet } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
 type SearchResult = {
-  type: 'client' | 'project' | 'sale' | 'commission' | 'plan' | 'team' | 'payout'
+  type: 'client' | 'invoice' | 'payment' | 'team'
   id: string
   title: string
   subtitle?: string
@@ -22,32 +14,23 @@ type SearchResult = {
 
 const icons = {
   client: Users,
-  project: FolderKanban,
-  sale: DollarSign,
-  commission: Calculator,
-  plan: FileText,
+  invoice: FileText,
   team: User,
-  payout: Wallet
+  payment: Wallet
 }
 
 const typeLabels = {
   client: 'Client',
-  project: 'Project',
-  sale: 'Sale',
-  commission: 'Commission',
-  plan: 'Plan',
   team: 'Team Member',
-  payout: 'Payout'
+  invoice: 'Invoice',
+  payment: 'Payment'
 }
 
 const typeColors = {
   client: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
-  project: 'bg-purple-500/10 text-purple-700 dark:text-purple-400',
-  sale: 'bg-green-500/10 text-green-700 dark:text-green-400',
-  commission: 'bg-primary/10 text-primary',
-  plan: 'bg-pink-500/10 text-pink-700 dark:text-pink-400',
   team: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400',
-  payout: 'bg-teal-500/10 text-teal-700 dark:text-teal-400'
+  invoice: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+  payment: 'bg-teal-500/10 text-teal-700 dark:text-teal-400'
 }
 
 export function SearchResultItem({ result }: { result: SearchResult }) {

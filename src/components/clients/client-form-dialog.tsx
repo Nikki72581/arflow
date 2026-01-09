@@ -24,23 +24,16 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { createClient, updateClient } from '@/app/actions/clients'
-import type { Client } from '@/lib/types'
-
-interface Territory {
-  id: string
-  name: string
-}
+import type { Customer } from '@/lib/types'
 
 interface ClientFormDialogProps {
-  client?: Client
-  territories?: Territory[]
+  client?: Customer
   trigger?: React.ReactNode
   defaultOpen?: boolean
 }
 
 export function ClientFormDialog({
   client,
-  territories = [],
   trigger,
   defaultOpen = false,
 }: ClientFormDialogProps) {
@@ -49,13 +42,9 @@ export function ClientFormDialog({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
-  const [tier, setTier] = useState<'STANDARD' | 'VIP' | 'NEW' | 'ENTERPRISE'>(
-    (client as any)?.tier || 'STANDARD'
+  const [status, setStatus] = useState<'ACTIVE' | 'INACTIVE' | 'ON_HOLD' | 'COLLECTIONS'>(
+    client?.status || 'ACTIVE'
   )
-  const [status, setStatus] = useState<'ACTIVE' | 'INACTIVE' | 'PROSPECTIVE' | 'CHURNED'>(
-    (client as any)?.status || 'ACTIVE'
-  )
-  const [territoryId, setTerritoryId] = useState((client as any)?.territoryId || '')
 
   const isEdit = !!client
 
@@ -65,16 +54,35 @@ export function ClientFormDialog({
     setError(null)
 
     const formData = new FormData(e.currentTarget)
+    const getString = (key: string) => {
+      const value = formData.get(key)
+      if (typeof value !== 'string') return undefined
+      const trimmed = value.trim()
+      return trimmed.length > 0 ? trimmed : undefined
+    }
+    const creditLimitValue = getString('creditLimit')
+    const creditLimit = creditLimitValue ? Number(creditLimitValue) : undefined
     const data = {
-      name: formData.get('name') as string,
-      email: formData.get('email') as string,
-      phone: formData.get('phone') as string,
-      address: formData.get('address') as string,
-      notes: formData.get('notes') as string,
-      tier,
+      companyName: getString('companyName') || '',
+      contactName: getString('contactName'),
+      email: getString('email'),
+      phone: getString('phone'),
+      website: getString('website'),
+      customerNumber: getString('customerNumber'),
+      paymentTerms: getString('paymentTerms'),
+      creditLimit: Number.isFinite(creditLimit) ? creditLimit : undefined,
+      billingAddress1: getString('billingAddress1'),
+      billingCity: getString('billingCity'),
+      billingState: getString('billingState'),
+      billingZip: getString('billingZip'),
+      billingCountry: getString('billingCountry'),
+      shippingAddress1: getString('shippingAddress1'),
+      shippingCity: getString('shippingCity'),
+      shippingState: getString('shippingState'),
+      shippingZip: getString('shippingZip'),
+      shippingCountry: getString('shippingCountry'),
+      notes: getString('notes'),
       status,
-      clientId: formData.get('clientId') as string,
-      territoryId: territoryId || undefined,
     }
 
     try {
@@ -145,30 +153,41 @@ export function ClientFormDialog({
               </div>
             )}
 
-            {isEdit && (client as any)?.externalSystem && (
+            {isEdit && client?.externalSystem && (
               <div className="rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3 text-sm sm:col-span-2">
                 <p className="font-medium text-blue-900 dark:text-blue-100">Integration Source</p>
                 <p className="text-blue-700 dark:text-blue-300 text-xs mt-1">
-                  This client was created from {(client as any).externalSystem} (ID: {(client as any).externalId})
+                  This client was created from {client.externalSystem}
+                  {client.externalId ? ` (ID: ${client.externalId})` : ''}
                 </p>
               </div>
             )}
 
             <div className="grid gap-2">
-              <Label htmlFor="name">
-                Name <span className="text-destructive">*</span>
+              <Label htmlFor="companyName">
+                Company name <span className="text-destructive">*</span>
               </Label>
               <Input
-                id="name"
-                name="name"
+                id="companyName"
+                name="companyName"
                 data-testid="client-name-input"
-                defaultValue={client?.name}
+                defaultValue={client?.companyName}
                 placeholder="Acme Corporation"
                 required
               />
-              {error && error.includes('name') && (
-                <p className="text-sm text-destructive" data-testid="client-name-error">Name is required</p>
+              {error && error.includes('companyName') && (
+                <p className="text-sm text-destructive" data-testid="client-name-error">Company name is required</p>
               )}
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="contactName">Primary contact</Label>
+              <Input
+                id="contactName"
+                name="contactName"
+                defaultValue={client?.contactName || ''}
+                placeholder="Alex Johnson"
+              />
             </div>
 
             <div className="grid gap-2">
@@ -199,83 +218,165 @@ export function ClientFormDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="address">Address</Label>
+              <Label htmlFor="website">Website</Label>
               <Input
-                id="address"
-                name="address"
-                data-testid="client-address-input"
-                defaultValue={client?.address || ''}
-                placeholder="123 Main St, City, State 12345"
+                id="website"
+                name="website"
+                defaultValue={client?.website || ''}
+                placeholder="https://acme.com"
               />
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="clientId">Client ID</Label>
+              <Label htmlFor="customerNumber">Customer number</Label>
               <Input
-                id="clientId"
-                name="clientId"
-                defaultValue={(client as any)?.clientId || ''}
-                placeholder="External system client ID"
+                id="customerNumber"
+                name="customerNumber"
+                defaultValue={client?.customerNumber || ''}
+                placeholder="CUST-1001"
               />
               <p className="text-xs text-muted-foreground">
-                External client ID for integrations
+                Reference ID for your records or integrations
               </p>
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="tier">Customer Tier</Label>
-              <Select value={tier} onValueChange={(value: 'STANDARD' | 'VIP' | 'NEW' | 'ENTERPRISE') => setTier(value)}>
-                <SelectTrigger data-testid="client-tier-select">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="STANDARD" data-testid="client-tier-standard">Standard</SelectItem>
-                  <SelectItem value="VIP" data-testid="client-tier-vip">VIP</SelectItem>
-                  <SelectItem value="NEW" data-testid="client-tier-new">New Customer</SelectItem>
-                  <SelectItem value="ENTERPRISE" data-testid="client-tier-enterprise">Enterprise</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Customer tier for tier-based commission rules
-              </p>
+              <Label htmlFor="paymentTerms">Payment terms</Label>
+              <Input
+                id="paymentTerms"
+                name="paymentTerms"
+                defaultValue={client?.paymentTerms || ''}
+                placeholder="Net 30"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="creditLimit">Credit limit</Label>
+              <Input
+                id="creditLimit"
+                name="creditLimit"
+                type="number"
+                min="0"
+                step="0.01"
+                defaultValue={client?.creditLimit ?? ''}
+                placeholder="0.00"
+              />
             </div>
 
             <div className="grid gap-2">
               <Label htmlFor="status">Status</Label>
-              <Select value={status} onValueChange={(value: 'ACTIVE' | 'INACTIVE' | 'PROSPECTIVE' | 'CHURNED') => setStatus(value)}>
+              <Select value={status} onValueChange={(value: 'ACTIVE' | 'INACTIVE' | 'ON_HOLD' | 'COLLECTIONS') => setStatus(value)}>
                 <SelectTrigger data-testid="client-status-select">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ACTIVE" data-testid="client-status-active">Active</SelectItem>
                   <SelectItem value="INACTIVE" data-testid="client-status-inactive">Inactive</SelectItem>
-                  <SelectItem value="PROSPECTIVE" data-testid="client-status-prospective">Prospective</SelectItem>
-                  <SelectItem value="CHURNED" data-testid="client-status-churned">Churned</SelectItem>
+                  <SelectItem value="ON_HOLD" data-testid="client-status-on-hold">On hold</SelectItem>
+                  <SelectItem value="COLLECTIONS" data-testid="client-status-collections">Collections</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Current status of the client relationship
-              </p>
             </div>
 
-            {territories.length > 0 && (
-              <div className="grid gap-2">
-                <Label htmlFor="territoryId">Territory</Label>
-                <Select value={territoryId || 'none'} onValueChange={(value) => setTerritoryId(value === 'none' ? '' : value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select territory" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No territory</SelectItem>
-                    {territories.map((territory) => (
-                      <SelectItem key={territory.id} value={territory.id}>
-                        {territory.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div className="grid gap-2">
+              <Label htmlFor="billingAddress1">Billing address</Label>
+              <Input
+                id="billingAddress1"
+                name="billingAddress1"
+                defaultValue={client?.billingAddress1 || ''}
+                placeholder="123 Main St"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="billingCity">Billing city</Label>
+              <Input
+                id="billingCity"
+                name="billingCity"
+                defaultValue={client?.billingCity || ''}
+                placeholder="Austin"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="billingState">Billing state</Label>
+              <Input
+                id="billingState"
+                name="billingState"
+                defaultValue={client?.billingState || ''}
+                placeholder="TX"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="billingZip">Billing zip</Label>
+              <Input
+                id="billingZip"
+                name="billingZip"
+                defaultValue={client?.billingZip || ''}
+                placeholder="78701"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="billingCountry">Billing country</Label>
+              <Input
+                id="billingCountry"
+                name="billingCountry"
+                defaultValue={client?.billingCountry || ''}
+                placeholder="USA"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="shippingAddress1">Shipping address</Label>
+              <Input
+                id="shippingAddress1"
+                name="shippingAddress1"
+                defaultValue={client?.shippingAddress1 || ''}
+                placeholder="123 Main St"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="shippingCity">Shipping city</Label>
+              <Input
+                id="shippingCity"
+                name="shippingCity"
+                defaultValue={client?.shippingCity || ''}
+                placeholder="Austin"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="shippingState">Shipping state</Label>
+              <Input
+                id="shippingState"
+                name="shippingState"
+                defaultValue={client?.shippingState || ''}
+                placeholder="TX"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="shippingZip">Shipping zip</Label>
+              <Input
+                id="shippingZip"
+                name="shippingZip"
+                defaultValue={client?.shippingZip || ''}
+                placeholder="78701"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="shippingCountry">Shipping country</Label>
+              <Input
+                id="shippingCountry"
+                name="shippingCountry"
+                defaultValue={client?.shippingCountry || ''}
+                placeholder="USA"
+              />
+            </div>
 
             <div className="grid gap-2 sm:col-span-2">
               <Label htmlFor="notes">Notes</Label>

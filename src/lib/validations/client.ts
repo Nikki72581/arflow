@@ -4,30 +4,52 @@ import { z } from 'zod'
  * Schema for creating a client
  */
 export const createClientSchema = z.object({
-  name: z.string().min(1, 'Client name is required').max(100, 'Name too long'),
+  companyName: z.string().min(1, 'Company name is required').max(150, 'Name too long'),
+  contactName: z.string().optional(),
   email: z.string().email('Invalid email address').optional().or(z.literal('')),
   phone: z.string().optional(),
-  address: z.string().optional(),
+  website: z.string().url('Invalid website URL').optional().or(z.literal('')),
+  customerNumber: z.string().optional(),
+  paymentTerms: z.string().optional(),
+  creditLimit: z.number().nonnegative().optional(),
+  billingAddress1: z.string().optional(),
+  billingCity: z.string().optional(),
+  billingState: z.string().optional(),
+  billingZip: z.string().optional(),
+  billingCountry: z.string().optional(),
+  shippingAddress1: z.string().optional(),
+  shippingCity: z.string().optional(),
+  shippingState: z.string().optional(),
+  shippingZip: z.string().optional(),
+  shippingCountry: z.string().optional(),
   notes: z.string().optional(),
-  tier: z.enum(['STANDARD', 'VIP', 'NEW', 'ENTERPRISE']).optional(),
-  status: z.enum(['ACTIVE', 'INACTIVE', 'PROSPECTIVE', 'CHURNED']).optional(),
-  clientId: z.string().optional(),
-  territoryId: z.string().optional(),
+  status: z.enum(['ACTIVE', 'INACTIVE', 'ON_HOLD', 'COLLECTIONS']).optional(),
 })
 
 /**
  * Schema for updating a client
  */
 export const updateClientSchema = z.object({
-  name: z.string().min(1, 'Client name is required').max(100, 'Name too long').optional(),
+  companyName: z.string().min(1, 'Company name is required').max(150, 'Name too long').optional(),
+  contactName: z.string().optional(),
   email: z.string().email('Invalid email address').optional().or(z.literal('')),
   phone: z.string().optional(),
-  address: z.string().optional(),
+  website: z.string().url('Invalid website URL').optional().or(z.literal('')),
+  customerNumber: z.string().optional(),
+  paymentTerms: z.string().optional(),
+  creditLimit: z.number().nonnegative().optional(),
+  billingAddress1: z.string().optional(),
+  billingCity: z.string().optional(),
+  billingState: z.string().optional(),
+  billingZip: z.string().optional(),
+  billingCountry: z.string().optional(),
+  shippingAddress1: z.string().optional(),
+  shippingCity: z.string().optional(),
+  shippingState: z.string().optional(),
+  shippingZip: z.string().optional(),
+  shippingCountry: z.string().optional(),
   notes: z.string().optional(),
-  tier: z.enum(['STANDARD', 'VIP', 'NEW', 'ENTERPRISE']).optional(),
-  status: z.enum(['ACTIVE', 'INACTIVE', 'PROSPECTIVE', 'CHURNED']).optional(),
-  clientId: z.string().optional(),
-  territoryId: z.string().optional(),
+  status: z.enum(['ACTIVE', 'INACTIVE', 'ON_HOLD', 'COLLECTIONS']).optional(),
 })
 
 /**

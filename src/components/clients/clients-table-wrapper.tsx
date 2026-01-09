@@ -17,10 +17,9 @@ import { formatDate } from '@/lib/utils'
 
 interface ClientsTableWrapperProps {
   clients: any[]
-  territories: any[]
 }
 
-export function ClientsTableWrapper({ clients, territories }: ClientsTableWrapperProps) {
+export function ClientsTableWrapper({ clients }: ClientsTableWrapperProps) {
   return (
     <TableWithPagination
       data={clients}
@@ -29,12 +28,11 @@ export function ClientsTableWrapper({ clients, territories }: ClientsTableWrappe
           <Table>
             <TableHeader>
               <TableRow className="border-b border-purple-500/10 bg-gradient-to-r from-purple-500/5 to-blue-500/5">
-                <TableHead className="font-semibold">Name</TableHead>
+                <TableHead className="font-semibold">Company</TableHead>
                 <TableHead className="font-semibold">Status</TableHead>
                 <TableHead className="font-semibold">Email</TableHead>
                 <TableHead className="font-semibold">Phone</TableHead>
-                {territories.length > 0 && <TableHead className="font-semibold">Territory</TableHead>}
-                <TableHead className="font-semibold">Projects</TableHead>
+                <TableHead className="font-semibold">Invoices</TableHead>
                 <TableHead className="font-semibold">Added</TableHead>
                 <TableHead className="w-[70px]"></TableHead>
               </TableRow>
@@ -52,13 +50,13 @@ export function ClientsTableWrapper({ clients, territories }: ClientsTableWrappe
                       data-testid="client-name"
                       className="font-medium text-purple-700 dark:text-purple-400 hover:underline hover:text-purple-900 dark:hover:text-purple-300 transition-colors"
                     >
-                      {client.name}
+                      {client.companyName}
                     </Link>
                   </TableCell>
                   <TableCell>
                     <Badge
                       data-testid="client-status-badge"
-                      variant={(client as any).status === 'ACTIVE' ? 'success' : (client as any).status === 'PROSPECTIVE' ? 'info' : (client as any).status === 'INACTIVE' ? 'secondary' : 'outline'}
+                      variant={(client as any).status === 'ACTIVE' ? 'success' : (client as any).status === 'ON_HOLD' ? 'warning' : (client as any).status === 'COLLECTIONS' ? 'destructive' : 'secondary'}
                       className="font-medium"
                     >
                       {(client as any).status || 'ACTIVE'}
@@ -70,24 +68,13 @@ export function ClientsTableWrapper({ clients, territories }: ClientsTableWrappe
                   <TableCell className="text-muted-foreground">
                     {client.phone || '—'}
                   </TableCell>
-                  {territories.length > 0 && (
-                    <TableCell>
-                      {(client as any).territory?.name ? (
-                        <Badge variant="outline" className="border-purple-500/30 text-purple-700 dark:text-purple-400">
-                          {(client as any).territory.name}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                  )}
                   <TableCell>
-                    {client.projects.length > 0 ? (
+                    {(client._count?.arDocuments ?? 0) > 0 ? (
                       <Badge
-                        variant={client.projects.length > 5 ? 'success' : client.projects.length > 2 ? 'info' : 'secondary'}
+                        variant={(client._count?.arDocuments ?? 0) > 5 ? 'success' : (client._count?.arDocuments ?? 0) > 2 ? 'info' : 'secondary'}
                         className="font-semibold"
                       >
-                        {client.projects.length}
+                        {client._count?.arDocuments ?? 0}
                       </Badge>
                     ) : (
                       <span className="text-muted-foreground">—</span>
@@ -97,7 +84,7 @@ export function ClientsTableWrapper({ clients, territories }: ClientsTableWrappe
                     {formatDate(client.createdAt)}
                   </TableCell>
                   <TableCell>
-                    <ClientActions client={client} territories={territories} />
+                    <ClientActions client={client} />
                   </TableCell>
                 </TableRow>
               ))}

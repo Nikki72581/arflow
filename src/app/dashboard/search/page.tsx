@@ -8,7 +8,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { SearchResultItem } from '@/components/search/search-result-item'
 
 type SearchResult = {
-  type: 'client' | 'project' | 'sale' | 'commission' | 'plan' | 'team' | 'payout'
+  type: 'client' | 'invoice' | 'payment' | 'team'
   id: string
   title: string
   subtitle?: string
@@ -23,12 +23,9 @@ type GroupedResults = {
 
 const typeLabels: Record<string, string> = {
   client: 'Clients',
-  project: 'Projects',
-  sale: 'Sales',
-  commission: 'Commissions',
-  plan: 'Commission Plans',
-  team: 'Team Members',
-  payout: 'Payouts'
+  invoice: 'Invoices',
+  payment: 'Payments',
+  team: 'Team Members'
 }
 
 export default function SearchPage() {
@@ -107,7 +104,7 @@ export default function SearchPage() {
           Search
         </h1>
         <p className="text-muted-foreground">
-          Search across clients, projects, sales, commissions, and more
+          Search across clients, invoices, payments, and more
         </p>
       </div>
 
@@ -117,7 +114,7 @@ export default function SearchPage() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search for clients, projects, sales, team members..."
+          placeholder="Search for clients, invoices, payments, team members..."
           className="pl-9"
           autoFocus
         />
@@ -141,7 +138,7 @@ export default function SearchPage() {
             <EmptyState
               icon={Search}
               title="Start searching"
-              description="Enter a search query to find clients, projects, sales, and more"
+              description="Enter a search query to find clients, invoices, payments, and more"
             />
           )}
 

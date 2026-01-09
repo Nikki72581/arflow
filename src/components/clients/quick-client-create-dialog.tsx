@@ -14,17 +14,10 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { createClient } from '@/app/actions/clients'
 
 interface QuickClientCreateDialogProps {
-  onClientCreated?: (client: { id: string; name: string }) => void
+  onClientCreated?: (client: { id: string; companyName: string }) => void
   trigger?: React.ReactNode
 }
 
@@ -35,7 +28,6 @@ export function QuickClientCreateDialog({
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [tier, setTier] = useState<'STANDARD' | 'VIP' | 'NEW' | 'ENTERPRISE'>('STANDARD')
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -44,10 +36,9 @@ export function QuickClientCreateDialog({
 
     const formData = new FormData(e.currentTarget)
     const data = {
-      name: formData.get('name') as string,
-      email: formData.get('email') as string || undefined,
-      phone: formData.get('phone') as string || undefined,
-      tier,
+      companyName: (formData.get('companyName') as string) || '',
+      email: (formData.get('email') as string) || undefined,
+      phone: (formData.get('phone') as string) || undefined,
       status: 'ACTIVE' as const,
     }
 
@@ -58,12 +49,11 @@ export function QuickClientCreateDialog({
         setOpen(false)
         // Reset form
         e.currentTarget.reset()
-        setTier('STANDARD')
         // Notify parent component
         if (onClientCreated) {
           onClientCreated({
             id: result.data.id,
-            name: result.data.name,
+            companyName: result.data.companyName,
           })
         }
       } else {
@@ -106,12 +96,12 @@ export function QuickClientCreateDialog({
             )}
 
             <div className="grid gap-2">
-              <Label htmlFor="name">
-                Client Name <span className="text-destructive">*</span>
+              <Label htmlFor="companyName">
+                Company name <span className="text-destructive">*</span>
               </Label>
               <Input
-                id="name"
-                name="name"
+                id="companyName"
+                name="companyName"
                 type="text"
                 placeholder="Acme Corporation"
                 required
@@ -139,24 +129,9 @@ export function QuickClientCreateDialog({
               />
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="tier">Client Tier</Label>
-              <Select value={tier} onValueChange={(value: 'STANDARD' | 'VIP' | 'NEW' | 'ENTERPRISE') => setTier(value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="STANDARD">Standard</SelectItem>
-                  <SelectItem value="VIP">VIP</SelectItem>
-                  <SelectItem value="NEW">New</SelectItem>
-                  <SelectItem value="ENTERPRISE">Enterprise</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 p-3 text-sm">
               <p className="text-blue-700 dark:text-blue-300">
-                The client will be created with Active status. You can add more details like address, territory, and notes from the Clients page.
+                The client will be created with Active status. You can add more details like payment terms, addresses, and notes from the Clients page.
               </p>
             </div>
           </div>

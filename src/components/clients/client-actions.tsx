@@ -22,19 +22,13 @@ import {
 } from '@/components/ui/alert-dialog'
 import { ClientFormDialog } from './client-form-dialog'
 import { deleteClient } from '@/app/actions/clients'
-import type { Client } from '@/lib/types'
-
-interface Territory {
-  id: string
-  name: string
-}
+import type { Customer } from '@/lib/types'
 
 interface ClientActionsProps {
-  client: Client
-  territories?: Territory[]
+  client: Customer
 }
 
-export function ClientActions({ client, territories = [] }: ClientActionsProps) {
+export function ClientActions({ client }: ClientActionsProps) {
   const router = useRouter()
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -64,7 +58,6 @@ export function ClientActions({ client, territories = [] }: ClientActionsProps) 
         <DropdownMenuContent align="end">
           <ClientFormDialog
             client={client}
-            territories={territories}
             trigger={
               <button
                 data-testid="edit-client-button"
@@ -90,7 +83,7 @@ export function ClientActions({ client, territories = [] }: ClientActionsProps) 
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete <strong>{client.name}</strong> and all
+              This will permanently delete <strong>{client.companyName}</strong> and all
               associated data. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

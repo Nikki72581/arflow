@@ -26,6 +26,7 @@ interface CreateClientInput {
   shippingState?: string
   shippingZip?: string
   shippingCountry?: string
+  status?: 'ACTIVE' | 'INACTIVE' | 'ON_HOLD' | 'COLLECTIONS'
 }
 
 /**
@@ -43,7 +44,7 @@ export async function createClient(input: CreateClientInput) {
       data: {
         ...input,
         organizationId: user.organizationId,
-        status: 'ACTIVE',
+        status: input.status ?? 'ACTIVE',
         currentBalance: 0,
         portalEnabled: false,
       },
