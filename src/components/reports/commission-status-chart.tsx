@@ -18,8 +18,8 @@ const COLORS = {
 
 export function CommissionStatusChart({ pending, approved, paid }: CommissionStatusChartProps) {
   const data = [
-    { name: 'Pending', value: pending, color: COLORS.pending },
-    { name: 'Approved', value: approved, color: COLORS.approved },
+    { name: 'Open', value: pending, color: COLORS.pending },
+    { name: 'Partial', value: approved, color: COLORS.approved },
     { name: 'Paid', value: paid, color: COLORS.paid },
   ].filter(item => item.value > 0) // Only show non-zero values
 
@@ -29,12 +29,12 @@ export function CommissionStatusChart({ pending, approved, paid }: CommissionSta
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Commission Status</CardTitle>
-          <CardDescription>Distribution by status</CardDescription>
+          <CardTitle>Invoice Status</CardTitle>
+          <CardDescription>Distribution by payment status</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center h-64 text-muted-foreground">
-            No commission data available
+            No invoice data available
           </div>
         </CardContent>
       </Card>
@@ -44,8 +44,8 @@ export function CommissionStatusChart({ pending, approved, paid }: CommissionSta
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Commission Status</CardTitle>
-        <CardDescription>Distribution by status</CardDescription>
+        <CardTitle>Invoice Status</CardTitle>
+        <CardDescription>Distribution by payment status</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
@@ -90,16 +90,16 @@ export function CommissionStatusChart({ pending, approved, paid }: CommissionSta
         </ResponsiveContainer>
         <div className="mt-4 grid grid-cols-3 gap-4 text-center">
           <div>
-            <div className="text-2xl font-bold text-yellow-600">{formatCurrency(pending)}</div>
-            <div className="text-xs text-muted-foreground">Pending</div>
+            <div className="text-2xl font-bold text-yellow-600">{pending}</div>
+            <div className="text-xs text-muted-foreground">Open Invoices</div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-blue-600">{formatCurrency(approved)}</div>
-            <div className="text-xs text-muted-foreground">Approved</div>
+            <div className="text-2xl font-bold text-blue-600">{approved}</div>
+            <div className="text-xs text-muted-foreground">Partial Payment</div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-green-600">{formatCurrency(paid)}</div>
-            <div className="text-xs text-muted-foreground">Paid</div>
+            <div className="text-2xl font-bold text-green-600">{paid}</div>
+            <div className="text-xs text-muted-foreground">Fully Paid</div>
           </div>
         </div>
       </CardContent>

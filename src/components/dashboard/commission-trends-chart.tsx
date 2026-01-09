@@ -37,15 +37,15 @@ export function CommissionTrendsChart({ data, type = 'area' }: CommissionTrendsC
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <div className="h-3 w-3 rounded-full" style={{ backgroundColor: 'var(--chart-1)' }} />
-            <span className="text-sm">Sales: {formatCurrency(payload[0].payload.sales)}</span>
+            <span className="text-sm">Invoices: {formatCurrency(payload[0].payload.sales)}</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="h-3 w-3 rounded-full" style={{ backgroundColor: 'var(--chart-2)' }} />
-            <span className="text-sm">Commissions: {formatCurrency(payload[0].payload.commissions)}</span>
+            <span className="text-sm">Payments: {formatCurrency(payload[0].payload.commissions)}</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="h-3 w-3 rounded-full" style={{ backgroundColor: 'var(--chart-3)' }} />
-            <span className="text-sm">Rate: {payload[0].payload.rate.toFixed(2)}%</span>
+            <span className="text-sm">Collection Rate: {payload[0].payload.rate.toFixed(2)}%</span>
           </div>
           <div className="text-xs text-muted-foreground mt-1">
             {payload[0].payload.count} transactions
@@ -58,8 +58,8 @@ export function CommissionTrendsChart({ data, type = 'area' }: CommissionTrendsC
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Commission Trends</CardTitle>
-        <CardDescription>Sales and commission performance over time</CardDescription>
+        <CardTitle>AR Performance Trends</CardTitle>
+        <CardDescription>Invoices and payments received over time</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={350}>
@@ -76,31 +76,31 @@ export function CommissionTrendsChart({ data, type = 'area' }: CommissionTrendsC
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis 
-                dataKey="monthLabel" 
+              <XAxis
+                dataKey="monthLabel"
                 className="text-xs"
                 tick={{ fontSize: 12 }}
               />
-              <YAxis 
+              <YAxis
                 className="text-xs"
                 tick={{ fontSize: 12 }}
                 tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
               />
               <Tooltip content={<CustomTooltip />} />
               <Legend />
-              <Area 
-                type="monotone" 
-                dataKey="sales" 
+              <Area
+                type="monotone"
+                dataKey="sales"
                 stroke="var(--chart-1)"
-                fill="url(#colorSales)" 
-                name="Sales"
+                fill="url(#colorSales)"
+                name="Invoices"
               />
-              <Area 
-                type="monotone" 
-                dataKey="commissions" 
+              <Area
+                type="monotone"
+                dataKey="commissions"
                 stroke="var(--chart-2)"
-                fill="url(#colorCommissions)" 
-                name="Commissions"
+                fill="url(#colorCommissions)"
+                name="Payments"
               />
             </AreaChart>
           ) : (
@@ -118,19 +118,19 @@ export function CommissionTrendsChart({ data, type = 'area' }: CommissionTrendsC
               />
               <Tooltip content={<CustomTooltip />} />
               <Legend />
-              <Line 
-                type="monotone" 
-                dataKey="sales" 
+              <Line
+                type="monotone"
+                dataKey="sales"
                 stroke="var(--chart-1)"
                 strokeWidth={2}
-                name="Sales"
+                name="Invoices"
               />
-              <Line 
-                type="monotone" 
-                dataKey="commissions" 
+              <Line
+                type="monotone"
+                dataKey="commissions"
                 stroke="var(--chart-2)"
                 strokeWidth={2}
-                name="Commissions"
+                name="Payments"
               />
             </LineChart>
           )}
