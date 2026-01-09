@@ -14,8 +14,8 @@ interface InviteTeamMemberInput {
 
 interface CreatePlaceholderUserInput {
   email: string
-  firstName: string
-  lastName: string
+  firstName?: string
+  lastName?: string
   role: 'ADMIN' | 'CUSTOMER'
 }
 

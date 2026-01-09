@@ -6,13 +6,14 @@ import { getSectionAccent, SectionAccent } from '@/lib/section-accent'
 import { cn } from '@/lib/utils'
 
 interface Performer {
-  userId: string
+  id: string
   name: string
   email: string
   totalSales: number
   totalCommissions: number
-  salesCount: number
-  averageCommissionRate: number
+  commissionsCount: number
+  conversionRate: number
+  outstandingBalance: number
 }
 
 interface TopPerformersProps {
@@ -24,7 +25,7 @@ interface TopPerformersProps {
 
 export function TopPerformers({ 
   performers, 
-  title = 'Top Performers',
+  title = 'Top Customers',
   showRank = true,
   accent = 'dashboard',
 }: TopPerformersProps) {
@@ -87,13 +88,13 @@ export function TopPerformers({
     >
       <CardHeader>
         <CardTitle>{title}</CardTitle>
-        <CardDescription>Based on total commissions earned</CardDescription>
+        <CardDescription>Based on total payments received</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           {performers.map((performer, index) => (
             <div
-              key={performer.userId}
+              key={performer.id}
               className="flex items-center gap-4 rounded-lg border p-4 transition-colors hover:bg-muted/50"
             >
               {showRank && (
@@ -121,10 +122,10 @@ export function TopPerformers({
                   {formatCurrency(performer.totalCommissions)}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {performer.salesCount} sales • {performer.averageCommissionRate.toFixed(1)}% avg
+                  {performer.commissionsCount} invoices • {performer.conversionRate.toFixed(1)}% collected
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {formatCurrency(performer.totalSales)} total sales
+                  {formatCurrency(performer.totalSales)} invoiced
                 </div>
               </div>
             </div>

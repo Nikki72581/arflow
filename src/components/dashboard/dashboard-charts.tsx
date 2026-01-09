@@ -42,13 +42,14 @@ interface TrendData {
 }
 
 interface Performer {
-  userId: string
+  id: string
   name: string
   email: string
   totalSales: number
   totalCommissions: number
-  salesCount: number
-  averageCommissionRate: number
+  commissionsCount: number
+  conversionRate: number
+  outstandingBalance: number
 }
 
 interface DashboardChartsProps {

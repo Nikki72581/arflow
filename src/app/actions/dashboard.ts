@@ -88,6 +88,9 @@ export async function getDashboardStats(dateRange: DateRange) {
         pendingCommissions: openDocs.length, // Open invoices
         approvedCommissions: partialDocs.length, // Partially paid
         paidCommissions: paidDocs, // Fully paid
+        pendingCount: openDocs.length,
+        approvedCount: partialDocs.length,
+        paidCount: paidDocs,
         averageCommissionRate: averageCollectionRate, // Collection rate percentage
         activePlansCount: 0, // Not applicable to ARFlow
         activeClientsCount: activeCustomers,

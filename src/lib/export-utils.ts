@@ -3,18 +3,14 @@ import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
 
 type ExportData = {
-  salespersonName: string
-  salespersonEmail: string
-  saleDate: Date
-  saleAmount: number
-  commissionAmount: number
-  commissionPercentage: number
-  projectName: string
-  clientName: string
-  commissionPlan: string
+  documentNumber: string
+  customerName: string
+  documentDate: string
+  dueDate: string
+  totalAmount: number
+  amountPaid: number
+  balanceDue: number
   status: string
-  approvedDate: Date | null
-  paidDate: Date | null
 }
 
 type DashboardStats = {
@@ -33,8 +29,9 @@ type Performer = {
   email: string
   totalSales: number
   totalCommissions: number
-  salesCount: number
-  averageCommissionRate: number
+  commissionsCount: number
+  conversionRate: number
+  outstandingBalance: number
 }
 
 export function exportToCSV(data: ExportData[], filename: string) {
@@ -42,36 +39,28 @@ export function exportToCSV(data: ExportData[], filename: string) {
 
   // Headers
   const headers = [
-    'Salesperson',
-    'Email',
-    'Sale Amount',
-    'Commission Amount',
-    'Commission %',
-    'Sale Date',
+    'Document Number',
+    'Customer',
+    'Document Date',
+    'Due Date',
+    'Total Amount',
+    'Amount Paid',
+    'Balance Due',
     'Status',
-    'Project',
-    'Client',
-    'Commission Plan',
-    'Approved Date',
-    'Paid Date',
   ]
   csvRows.push(headers.join(','))
 
   // Data rows
   data.forEach(row => {
     const values = [
-      `"${row.salespersonName}"`,
-      `"${row.salespersonEmail}"`,
-      row.saleAmount.toFixed(2),
-      row.commissionAmount.toFixed(2),
-      row.commissionPercentage.toFixed(2),
-      new Date(row.saleDate).toLocaleDateString(),
+      `"${row.documentNumber}"`,
+      `"${row.customerName}"`,
+      row.documentDate,
+      row.dueDate,
+      row.totalAmount.toFixed(2),
+      row.amountPaid.toFixed(2),
+      row.balanceDue.toFixed(2),
       row.status,
-      `"${row.projectName}"`,
-      `"${row.clientName}"`,
-      `"${row.commissionPlan}"`,
-      row.approvedDate ? new Date(row.approvedDate).toLocaleDateString() : '',
-      row.paidDate ? new Date(row.paidDate).toLocaleDateString() : '',
     ]
     csvRows.push(values.join(','))
   })
@@ -99,7 +88,7 @@ export async function exportToPDF(
 
   // Title
   doc.setFontSize(20)
-  doc.text('Commission Report', 14, 22)
+  doc.text('AR Report', 14, 22)
 
   // Date
   doc.setFontSize(10)
@@ -115,13 +104,13 @@ export async function exportToPDF(
 
     doc.setFontSize(10)
     const summaryData = [
-      ['Total Sales', `$${stats.totalSales.toLocaleString('en-US', { minimumFractionDigits: 2 })}`],
-      ['Total Commissions', `$${stats.totalCommissions.toLocaleString('en-US', { minimumFractionDigits: 2 })}`],
-      ['Average Rate', `${stats.averageCommissionRate.toFixed(2)}%`],
-      ['Sales Count', stats.salesCount.toString()],
-      ['Pending Commissions', `$${stats.pendingCommissions.toLocaleString('en-US', { minimumFractionDigits: 2 })}`],
-      ['Approved Commissions', `$${stats.approvedCommissions.toLocaleString('en-US', { minimumFractionDigits: 2 })}`],
-      ['Paid Commissions', `$${stats.paidCommissions.toLocaleString('en-US', { minimumFractionDigits: 2 })}`],
+      ['Total Invoices', `$${stats.totalSales.toLocaleString('en-US', { minimumFractionDigits: 2 })}`],
+      ['Total Outstanding', `$${stats.totalCommissions.toLocaleString('en-US', { minimumFractionDigits: 2 })}`],
+      ['Collection Rate', `${stats.averageCommissionRate.toFixed(2)}%`],
+      ['Invoice Count', stats.salesCount.toString()],
+      ['Open Invoices', stats.pendingCommissions.toString()],
+      ['Partial Payments', stats.approvedCommissions.toString()],
+      ['Paid Invoices', stats.paidCommissions.toString()],
     ]
 
     autoTable(doc, {
@@ -139,7 +128,7 @@ export async function exportToPDF(
   // Top Performers
   if (performers.length > 0) {
     doc.setFontSize(14)
-    doc.text('Top Performers', 14, yPos)
+    doc.text('Top Customers', 14, yPos)
     yPos += 8
 
     const performerData = performers.slice(0, 10).map((p, index) => [
@@ -147,13 +136,13 @@ export async function exportToPDF(
       p.name,
       `$${p.totalSales.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
       `$${p.totalCommissions.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-      p.salesCount.toString(),
-      `${p.averageCommissionRate.toFixed(2)}%`,
+      p.commissionsCount.toString(),
+      `${p.conversionRate.toFixed(2)}%`,
     ])
 
     autoTable(doc, {
       startY: yPos,
-      head: [['Rank', 'Name', 'Total Sales', 'Commissions', 'Sales Count', 'Avg Rate']],
+      head: [['Rank', 'Name', 'Total Invoices', 'Payments', 'Invoices', 'Collection Rate']],
       body: performerData,
       theme: 'striped',
       headStyles: { fillColor: [59, 130, 246] },
@@ -167,20 +156,21 @@ export async function exportToPDF(
   if (data.length > 0) {
     doc.addPage()
     doc.setFontSize(14)
-    doc.text('Detailed Commission Data', 14, 20)
+    doc.text('Invoice Detail', 14, 20)
 
     const detailedData = data.map(row => [
-      row.salespersonName,
-      `$${row.saleAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-      `$${row.commissionAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-      `${row.commissionPercentage.toFixed(2)}%`,
-      new Date(row.saleDate).toLocaleDateString(),
+      row.documentNumber,
+      row.customerName,
+      row.documentDate,
+      row.dueDate,
+      `$${row.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+      `$${row.balanceDue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
       row.status,
     ])
 
     autoTable(doc, {
       startY: 28,
-      head: [['Salesperson', 'Sale', 'Commission', 'Rate', 'Date', 'Status']],
+      head: [['Document', 'Customer', 'Date', 'Due', 'Total', 'Balance', 'Status']],
       body: detailedData,
       theme: 'striped',
       headStyles: { fillColor: [59, 130, 246] },
@@ -203,18 +193,18 @@ export async function exportToExcel(
   // Summary Sheet
   if (stats) {
     const summaryData = [
-      ['Commission Report Summary'],
+      ['AR Report Summary'],
       ['Generated', new Date().toLocaleString()],
       [],
       ['Metric', 'Value'],
-      ['Total Sales', stats.totalSales],
-      ['Total Commissions', stats.totalCommissions],
-      ['Average Commission Rate', stats.averageCommissionRate / 100],
-      ['Sales Count', stats.salesCount],
-      ['Commissions Count', stats.commissionsCount],
-      ['Pending Commissions', stats.pendingCommissions],
-      ['Approved Commissions', stats.approvedCommissions],
-      ['Paid Commissions', stats.paidCommissions],
+      ['Total Invoices', stats.totalSales],
+      ['Total Outstanding', stats.totalCommissions],
+      ['Collection Rate', stats.averageCommissionRate / 100],
+      ['Invoice Count', stats.salesCount],
+      ['Outstanding Count', stats.commissionsCount],
+      ['Open Invoices', stats.pendingCommissions],
+      ['Partial Payments', stats.approvedCommissions],
+      ['Paid Invoices', stats.paidCommissions],
     ]
 
     const summarySheet = XLSX.utils.aoa_to_sheet(summaryData)
@@ -240,17 +230,17 @@ export async function exportToExcel(
   // Top Performers Sheet
   if (performers.length > 0) {
     const performerData = [
-      ['Top Performers'],
+      ['Top Customers'],
       [],
-      ['Rank', 'Name', 'Email', 'Total Sales', 'Total Commissions', 'Sales Count', 'Avg Rate'],
+      ['Rank', 'Name', 'Email', 'Total Invoices', 'Payments', 'Invoices', 'Collection Rate'],
       ...performers.map((p, index) => [
         index + 1,
         p.name,
         p.email,
         p.totalSales,
         p.totalCommissions,
-        p.salesCount,
-        p.averageCommissionRate / 100,
+        p.commissionsCount,
+        p.conversionRate / 100,
       ]),
     ]
 
@@ -273,35 +263,27 @@ export async function exportToExcel(
   // Detailed Data Sheet
   if (data.length > 0) {
     const detailedData = [
-      ['Detailed Commission Data'],
+      ['Invoice Detail'],
       [],
       [
-        'Salesperson',
-        'Email',
-        'Sale Amount',
-        'Commission Amount',
-        'Commission %',
-        'Sale Date',
+        'Document Number',
+        'Customer',
+        'Document Date',
+        'Due Date',
+        'Total Amount',
+        'Amount Paid',
+        'Balance Due',
         'Status',
-        'Project',
-        'Client',
-        'Commission Plan',
-        'Approved Date',
-        'Paid Date',
       ],
       ...data.map(row => [
-        row.salespersonName,
-        row.salespersonEmail,
-        row.saleAmount,
-        row.commissionAmount,
-        row.commissionPercentage / 100,
-        new Date(row.saleDate),
+        row.documentNumber,
+        row.customerName,
+        row.documentDate,
+        row.dueDate,
+        row.totalAmount,
+        row.amountPaid,
+        row.balanceDue,
         row.status,
-        row.projectName,
-        row.clientName,
-        row.commissionPlan,
-        row.approvedDate ? new Date(row.approvedDate) : '',
-        row.paidDate ? new Date(row.paidDate) : '',
       ]),
     ]
 
@@ -309,18 +291,14 @@ export async function exportToExcel(
 
     // Set column widths
     detailedSheet['!cols'] = [
-      { wch: 20 }, // Salesperson
-      { wch: 30 }, // Email
-      { wch: 15 }, // Sale Amount
-      { wch: 15 }, // Commission Amount
-      { wch: 12 }, // Commission %
-      { wch: 15 }, // Sale Date
+      { wch: 18 }, // Document Number
+      { wch: 28 }, // Customer
+      { wch: 14 }, // Document Date
+      { wch: 14 }, // Due Date
+      { wch: 14 }, // Total Amount
+      { wch: 14 }, // Amount Paid
+      { wch: 14 }, // Balance Due
       { wch: 12 }, // Status
-      { wch: 20 }, // Project
-      { wch: 20 }, // Client
-      { wch: 20 }, // Commission Plan
-      { wch: 15 }, // Approved Date
-      { wch: 15 }, // Paid Date
     ]
 
     XLSX.utils.book_append_sheet(workbook, detailedSheet, 'Detailed Data')

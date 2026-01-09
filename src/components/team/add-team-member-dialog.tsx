@@ -88,14 +88,22 @@ export function AddTeamMemberDialog() {
 
     setLoading(true)
     try {
-      const result = await inviteTeamMembers(validEmails)
+      const result = await inviteTeamMembers(
+        validEmails.map(email => ({
+          email: email.trim(),
+          firstName: '',
+          lastName: '',
+          role: 'CUSTOMER',
+        }))
+      )
 
       if (!result.success) {
         toast.error(result.error || 'Failed to send invitations')
         return
       }
 
-      toast.success(`Successfully invited ${result.data?.invitationCount} team member(s)`)
+      const invitedCount = result.results?.filter((entry) => entry.success).length || 0
+      toast.success(`Successfully invited ${invitedCount} team member(s)`)
       setInviteEmails([''])
       setOpen(false)
     } catch (error) {
@@ -130,7 +138,8 @@ export function AddTeamMemberDialog() {
         return
       }
 
-      toast.success(`Successfully created ${result.data?.count} placeholder user(s)`)
+      const createdCount = result.data?.length || 0
+      toast.success(`Successfully created ${createdCount} placeholder user(s)`)
       setPlaceholderUsers([{
         email: '',
         firstName: '',

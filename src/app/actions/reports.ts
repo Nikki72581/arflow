@@ -32,19 +32,19 @@ export async function getSalesByCategory(dateRange?: DateRange) {
     })
 
     // Group by customer
-    const categoryMap = new Map<string, { category: string; value: number; count: number }>()
+    const categoryMap = new Map<string, { category: string; sales: number; count: number }>()
 
     documents.forEach(doc => {
       const customerName = doc.customer.companyName
-      const existing = categoryMap.get(customerName) || { category: customerName, value: 0, count: 0 }
-      existing.value += doc.totalAmount
+      const existing = categoryMap.get(customerName) || { category: customerName, sales: 0, count: 0 }
+      existing.sales += doc.totalAmount
       existing.count += 1
       categoryMap.set(customerName, existing)
     })
 
-    // Convert to array and sort by value
+    // Convert to array and sort by sales
     const data = Array.from(categoryMap.values())
-      .sort((a, b) => b.value - a.value)
+      .sort((a, b) => b.sales - a.sales)
       .slice(0, 10) // Top 10 customers
 
     return {

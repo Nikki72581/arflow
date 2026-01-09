@@ -68,7 +68,7 @@ export function EnhancedHeader({
 
   const handleThemeChange = async (newTheme: 'light' | 'dark' | 'system') => {
     setTheme(newTheme)
-    const result = await updateThemePreference({ themePreference: newTheme })
+    const result = await updateThemePreference(newTheme)
 
     if (!result.success) {
       toast({

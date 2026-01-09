@@ -5,13 +5,14 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { formatCurrency } from '@/lib/utils'
 
 interface Performer {
-  userId: string
+  id: string
   name: string
   email: string
   totalSales: number
   totalCommissions: number
-  salesCount: number
-  averageCommissionRate: number
+  commissionsCount: number
+  conversionRate: number
+  outstandingBalance: number
 }
 
 interface PerformanceComparisonChartProps {
@@ -23,7 +24,7 @@ export function PerformanceComparisonChart({ performers }: PerformanceComparison
     name: p.name.split(' ')[0], // First name only for space
     sales: p.totalSales,
     commissions: p.totalCommissions,
-    count: p.salesCount,
+    count: p.commissionsCount,
   }))
 
   if (data.length === 0) {
@@ -31,7 +32,7 @@ export function PerformanceComparisonChart({ performers }: PerformanceComparison
       <Card>
         <CardHeader>
           <CardTitle>Performance Comparison</CardTitle>
-          <CardDescription>Sales vs Commissions by salesperson</CardDescription>
+          <CardDescription>Invoices vs Payments by customer</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center h-80 text-muted-foreground">
@@ -46,7 +47,7 @@ export function PerformanceComparisonChart({ performers }: PerformanceComparison
     <Card>
       <CardHeader>
         <CardTitle>Performance Comparison</CardTitle>
-        <CardDescription>Sales vs Commissions by salesperson</CardDescription>
+        <CardDescription>Invoices vs Payments by customer</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={400}>
@@ -72,7 +73,7 @@ export function PerformanceComparisonChart({ performers }: PerformanceComparison
                         <div className="grid grid-cols-2 gap-2">
                           <div className="flex flex-col">
                             <span className="text-[0.70rem] uppercase text-muted-foreground">
-                              Sales
+                              Invoices
                             </span>
                             <span className="font-bold text-blue-600">
                               {formatCurrency(payload[0].payload.sales)}
@@ -80,16 +81,16 @@ export function PerformanceComparisonChart({ performers }: PerformanceComparison
                           </div>
                           <div className="flex flex-col">
                             <span className="text-[0.70rem] uppercase text-muted-foreground">
-                              Commissions
+                              Payments
                             </span>
-                            <span className="font-bold text-green-600">
+                            <span className="font-bold text-emerald-600">
                               {formatCurrency(payload[0].payload.commissions)}
                             </span>
                           </div>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-[0.70rem] uppercase text-muted-foreground">
-                            Transactions
+                            Invoices
                           </span>
                           <span className="font-bold text-muted-foreground">
                             {payload[0].payload.count}
@@ -103,8 +104,8 @@ export function PerformanceComparisonChart({ performers }: PerformanceComparison
               }}
             />
             <Legend />
-            <Bar dataKey="sales" fill="#3b82f6" name="Sales" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="commissions" fill="#22c55e" name="Commissions" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="sales" fill="#3b82f6" name="Invoices" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="commissions" fill="#22c55e" name="Payments" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

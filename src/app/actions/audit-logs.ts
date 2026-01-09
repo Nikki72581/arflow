@@ -201,7 +201,9 @@ export async function exportAuditLogsToCsv(filters: AuditLogFilters) {
 /**
  * Purge old audit logs (admin only)
  */
-export async function purgeAuditLogs(olderThanDays: number) {
+export async function purgeAuditLogs(
+  params: number | { startDate?: Date; endDate?: Date }
+) {
   try {
     const user = await getCurrentUserWithOrg()
 
@@ -209,16 +211,25 @@ export async function purgeAuditLogs(olderThanDays: number) {
       return { success: false, error: 'Only admins can purge audit logs' }
     }
 
-    const cutoffDate = new Date()
-    cutoffDate.setDate(cutoffDate.getDate() - olderThanDays)
+    const where: {
+      organizationId: string
+      createdAt?: { lt?: Date; gte?: Date; lte?: Date }
+    } = { organizationId: user.organizationId }
+
+    if (typeof params === 'number') {
+      const cutoffDate = new Date()
+      cutoffDate.setDate(cutoffDate.getDate() - params)
+      where.createdAt = { lt: cutoffDate }
+    } else {
+      if (params.startDate || params.endDate) {
+        where.createdAt = {}
+        if (params.startDate) where.createdAt.gte = params.startDate
+        if (params.endDate) where.createdAt.lte = params.endDate
+      }
+    }
 
     const result = await prisma.auditLog.deleteMany({
-      where: {
-        organizationId: user.organizationId,
-        createdAt: {
-          lt: cutoffDate,
-        },
-      },
+      where,
     })
 
     revalidatePath('/dashboard/audit-logs')

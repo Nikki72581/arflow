@@ -5,13 +5,14 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { formatCurrency } from '@/lib/utils'
 
 interface Performer {
-  userId: string
+  id: string
   name: string
   email: string
   totalSales: number
   totalCommissions: number
-  salesCount: number
-  averageCommissionRate: number
+  commissionsCount: number
+  conversionRate: number
+  outstandingBalance: number
 }
 
 interface TopPerformersBarChartProps {
@@ -31,8 +32,8 @@ export function TopPerformersBarChart({ performers }: TopPerformersBarChartProps
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Top Performers</CardTitle>
-          <CardDescription>Commission earnings by top salespeople</CardDescription>
+          <CardTitle>Top Customers</CardTitle>
+          <CardDescription>Payments received by top customers</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center h-64 text-muted-foreground">
@@ -46,8 +47,8 @@ export function TopPerformersBarChart({ performers }: TopPerformersBarChartProps
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Top Performers</CardTitle>
-        <CardDescription>Commission earnings by top salespeople</CardDescription>
+        <CardTitle>Top Customers</CardTitle>
+        <CardDescription>Payments received by top customers</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
@@ -78,9 +79,9 @@ export function TopPerformersBarChart({ performers }: TopPerformersBarChartProps
                         </div>
                         <div className="flex flex-col">
                           <span className="text-[0.70rem] uppercase text-muted-foreground">
-                            Commissions
+                            Payments
                           </span>
-                          <span className="font-bold text-green-600">
+                          <span className="font-bold text-emerald-600">
                             {formatCurrency(payload[0].payload.commissions)}
                           </span>
                         </div>

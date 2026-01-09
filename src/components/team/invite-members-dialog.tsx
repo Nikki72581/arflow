@@ -44,14 +44,22 @@ export function InviteMembersDialog() {
 
     setLoading(true)
     try {
-      const result = await inviteTeamMembers(validEmails)
+      const result = await inviteTeamMembers(
+        validEmails.map(email => ({
+          email: email.trim(),
+          firstName: '',
+          lastName: '',
+          role: 'CUSTOMER',
+        }))
+      )
 
       if (!result.success) {
         toast.error(result.error || 'Failed to send invitations')
         return
       }
 
-      toast.success(`Successfully invited ${result.data?.invitationCount} team member(s)`)
+      const invitedCount = result.results?.filter((entry) => entry.success).length || 0
+      toast.success(`Successfully invited ${invitedCount} team member(s)`)
       setEmails([''])
       setOpen(false)
     } catch (error) {

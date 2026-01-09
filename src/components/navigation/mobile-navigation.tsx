@@ -114,7 +114,7 @@ export function MobileBottomNav({
                 <div className="flex-1 overflow-y-auto">
                   <EnhancedSidebar
                     userRole={userRole}
-                    pendingCount={pendingCount}
+                    overdueCount={pendingCount}
                   />
                 </div>
               </div>
@@ -161,7 +161,7 @@ export function MobileHeader({
               <div className="flex-1 overflow-y-auto">
                 <EnhancedSidebar
                   userRole={userRole}
-                  pendingCount={pendingCount}
+                  overdueCount={pendingCount}
                 />
               </div>
             </div>

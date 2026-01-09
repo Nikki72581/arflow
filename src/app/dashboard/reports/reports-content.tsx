@@ -51,13 +51,14 @@ type CommissionTrend = {
 }
 
 type Performer = {
-  userId: string
+  id: string
   name: string
   email: string
   totalSales: number
   totalCommissions: number
-  salesCount: number
-  averageCommissionRate: number
+  commissionsCount: number
+  conversionRate: number
+  outstandingBalance: number
 }
 
 export function ReportsContent() {
@@ -69,6 +70,14 @@ export function ReportsContent() {
   const [chartType, setChartType] = useState<'line' | 'area'>('area')
   const [exporting, setExporting] = useState(false)
 
+  const getEffectiveDateRange = () => {
+    if (dateRange) return dateRange
+    const to = new Date()
+    const from = new Date(to)
+    from.setMonth(from.getMonth() - 12)
+    return { from, to }
+  }
+
   useEffect(() => {
     loadData()
   }, [dateRange])
@@ -76,10 +85,11 @@ export function ReportsContent() {
   async function loadData() {
     setLoading(true)
     try {
+      const effectiveRange = getEffectiveDateRange()
       const [statsResult, trendsResult, performersResult] = await Promise.all([
-        getDashboardStats(dateRange),
-        getCommissionTrends({ months: 12, dateRange }),
-        getTopPerformers(dateRange, 50),
+        getDashboardStats(effectiveRange),
+        getCommissionTrends({ dateRange: effectiveRange }),
+        getTopPerformers(effectiveRange, 50),
       ])
 
       if (statsResult.success && statsResult.data) {
@@ -101,7 +111,8 @@ export function ReportsContent() {
   async function handleExport(format: 'csv' | 'pdf' | 'excel') {
     setExporting(true)
     try {
-      const exportResult = await getCommissionExportData(dateRange)
+      const effectiveRange = getEffectiveDateRange()
+      const exportResult = await getCommissionExportData(effectiveRange, format)
 
       if (!exportResult.success || !exportResult.data) {
         throw new Error('Failed to fetch export data')
@@ -271,9 +282,9 @@ export function ReportsContent() {
             {/* Top Performers Table */}
             <Card>
               <CardHeader>
-                <CardTitle>Salesperson Rankings</CardTitle>
+                <CardTitle>Customer Rankings</CardTitle>
                 <CardDescription>
-                  Performance metrics for all salespeople
+                  Performance metrics for all customers
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -281,20 +292,22 @@ export function ReportsContent() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Rank</TableHead>
-                      <TableHead>Salesperson</TableHead>
-                      <TableHead className="text-right">Total Sales</TableHead>
-                      <TableHead className="text-right">Total Commissions</TableHead>
-                      <TableHead className="text-right">Number of Sales</TableHead>
-                      <TableHead className="text-right">Avg Commission %</TableHead>
-                      <TableHead className="text-right">Avg Sale Amount</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead className="text-right">Total Invoices</TableHead>
+                      <TableHead className="text-right">Total Payments</TableHead>
+                      <TableHead className="text-right">Invoice Count</TableHead>
+                      <TableHead className="text-right">Collection Rate</TableHead>
+                      <TableHead className="text-right">Avg Invoice Amount</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {performers.map((performer, index) => {
-                      const averageSaleAmount = performer.totalSales / performer.salesCount
+                      const averageInvoiceAmount = performer.commissionsCount
+                        ? performer.totalSales / performer.commissionsCount
+                        : 0
 
                       return (
-                        <TableRow key={performer.userId}>
+                        <TableRow key={performer.id}>
                           <TableCell>
                             <Badge variant={index < 3 ? 'default' : 'outline'}>
                               #{index + 1}
@@ -311,19 +324,19 @@ export function ReportsContent() {
                           <TableCell className="text-right font-medium">
                             {formatCurrency(performer.totalSales)}
                           </TableCell>
-                          <TableCell className="text-right font-medium text-green-600">
+                          <TableCell className="text-right font-medium text-emerald-600">
                             {formatCurrency(performer.totalCommissions)}
                           </TableCell>
                           <TableCell className="text-right">
-                            {performer.salesCount}
+                            {performer.commissionsCount}
                           </TableCell>
                           <TableCell className="text-right">
                             <Badge variant="secondary">
-                              {performer.averageCommissionRate.toFixed(2)}%
+                              {performer.conversionRate.toFixed(2)}%
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            {formatCurrency(averageSaleAmount)}
+                            {formatCurrency(averageInvoiceAmount)}
                           </TableCell>
                         </TableRow>
                       )
