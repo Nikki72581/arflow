@@ -6,21 +6,21 @@ import { prisma } from './db'
  */
 
 export type AuditAction =
-  // Commission actions
-  | 'commission_created'
-  | 'commission_approved'
-  | 'commission_paid'
-  | 'commission_rejected'
-  | 'bulk_payout_processed'
-  // Sale actions
-  | 'sale_created'
-  | 'sale_updated'
-  | 'sale_deleted'
-  // Plan actions
-  | 'plan_created'
-  | 'plan_updated'
-  | 'plan_activated'
-  | 'plan_deactivated'
+  // AR Document actions
+  | 'invoice_created'
+  | 'invoice_updated'
+  | 'invoice_deleted'
+  | 'invoice_voided'
+  | 'credit_memo_created'
+  | 'debit_memo_created'
+  // Payment actions
+  | 'payment_created'
+  | 'payment_applied'
+  | 'payment_voided'
+  // Customer actions
+  | 'customer_created'
+  | 'customer_updated'
+  | 'customer_deleted'
   // User actions
   | 'user_invited'
   | 'user_role_changed'
@@ -31,13 +31,11 @@ export type AuditAction =
   | 'integration_sync'
   | 'integration_sync_reverted'
 
-export type EntityType = 
-  | 'commission'
-  | 'sale'
-  | 'plan'
+export type EntityType =
+  | 'invoice'
+  | 'payment'
+  | 'customer'
   | 'user'
-  | 'client'
-  | 'project'
   | 'organization'
   | 'settings'
   | 'integration'
@@ -94,119 +92,13 @@ export async function createAuditLog(params: CreateAuditLogParams) {
 }
 
 /**
- * Create audit log for commission approval
+ * Create audit log for invoice creation
  */
-export async function logCommissionApproval(params: {
-  commissionId: string
+export async function logInvoiceCreated(params: {
+  invoiceId: string
+  invoiceNumber: string
   amount: number
-  salespersonId: string
-  salespersonName: string
-  approvedBy: {
-    id: string
-    name: string
-    email: string
-  }
-  organizationId: string
-  ipAddress?: string
-}) {
-  return createAuditLog({
-    userId: params.approvedBy.id,
-    userName: params.approvedBy.name,
-    userEmail: params.approvedBy.email,
-    action: 'commission_approved',
-    entityType: 'commission',
-    entityId: params.commissionId,
-    description: `Approved commission of $${params.amount.toFixed(2)} for ${params.salespersonName}`,
-    metadata: {
-      amount: params.amount,
-      salespersonId: params.salespersonId,
-      salespersonName: params.salespersonName,
-      oldStatus: 'PENDING',
-      newStatus: 'APPROVED',
-    },
-    organizationId: params.organizationId,
-    ipAddress: params.ipAddress,
-  })
-}
-
-/**
- * Create audit log for commission payment
- */
-export async function logCommissionPayment(params: {
-  commissionId: string
-  amount: number
-  salespersonId: string
-  salespersonName: string
-  paidBy: {
-    id: string
-    name: string
-    email: string
-  }
-  organizationId: string
-  ipAddress?: string
-}) {
-  return createAuditLog({
-    userId: params.paidBy.id,
-    userName: params.paidBy.name,
-    userEmail: params.paidBy.email,
-    action: 'commission_paid',
-    entityType: 'commission',
-    entityId: params.commissionId,
-    description: `Marked commission of $${params.amount.toFixed(2)} as paid for ${params.salespersonName}`,
-    metadata: {
-      amount: params.amount,
-      salespersonId: params.salespersonId,
-      salespersonName: params.salespersonName,
-      oldStatus: 'APPROVED',
-      newStatus: 'PAID',
-    },
-    organizationId: params.organizationId,
-    ipAddress: params.ipAddress,
-  })
-}
-
-/**
- * Create audit log for bulk payout
- */
-export async function logBulkPayout(params: {
-  totalAmount: number
-  commissionsCount: number
-  salespeopleCount: number
-  calculationIds: string[]
-  processedBy: {
-    id: string
-    name: string
-    email: string
-  }
-  organizationId: string
-  ipAddress?: string
-}) {
-  return createAuditLog({
-    userId: params.processedBy.id,
-    userName: params.processedBy.name,
-    userEmail: params.processedBy.email,
-    action: 'bulk_payout_processed',
-    entityType: 'commission',
-    description: `Processed bulk payout of $${params.totalAmount.toFixed(2)} for ${params.commissionsCount} commissions across ${params.salespeopleCount} salespeople`,
-    metadata: {
-      totalAmount: params.totalAmount,
-      commissionsCount: params.commissionsCount,
-      salespeopleCount: params.salespeopleCount,
-      calculationIds: params.calculationIds,
-    },
-    organizationId: params.organizationId,
-    ipAddress: params.ipAddress,
-  })
-}
-
-/**
- * Create audit log for sale creation
- */
-export async function logSaleCreated(params: {
-  saleId: string
-  amount: number
-  clientName: string
-  projectName: string
+  customerName: string
   createdBy: {
     id: string
     name: string
@@ -219,14 +111,14 @@ export async function logSaleCreated(params: {
     userId: params.createdBy.id,
     userName: params.createdBy.name,
     userEmail: params.createdBy.email,
-    action: 'sale_created',
-    entityType: 'sale',
-    entityId: params.saleId,
-    description: `Created sale of $${params.amount.toFixed(2)} for ${params.clientName} - ${params.projectName}`,
+    action: 'invoice_created',
+    entityType: 'invoice',
+    entityId: params.invoiceId,
+    description: `Created invoice ${params.invoiceNumber} for $${params.amount.toFixed(2)} for ${params.customerName}`,
     metadata: {
+      invoiceNumber: params.invoiceNumber,
       amount: params.amount,
-      clientName: params.clientName,
-      projectName: params.projectName,
+      customerName: params.customerName,
     },
     organizationId: params.organizationId,
     ipAddress: params.ipAddress,
@@ -234,13 +126,15 @@ export async function logSaleCreated(params: {
 }
 
 /**
- * Create audit log for plan changes
+ * Create audit log for payment application
  */
-export async function logPlanUpdated(params: {
-  planId: string
-  planName: string
-  changes: Record<string, any>
-  updatedBy: {
+export async function logPaymentApplied(params: {
+  paymentId: string
+  paymentNumber: string
+  amount: number
+  customerName: string
+  invoiceNumber: string
+  appliedBy: {
     id: string
     name: string
     email: string
@@ -249,16 +143,48 @@ export async function logPlanUpdated(params: {
   ipAddress?: string
 }) {
   return createAuditLog({
-    userId: params.updatedBy.id,
-    userName: params.updatedBy.name,
-    userEmail: params.updatedBy.email,
-    action: 'plan_updated',
-    entityType: 'plan',
-    entityId: params.planId,
-    description: `Updated commission plan "${params.planName}"`,
+    userId: params.appliedBy.id,
+    userName: params.appliedBy.name,
+    userEmail: params.appliedBy.email,
+    action: 'payment_applied',
+    entityType: 'payment',
+    entityId: params.paymentId,
+    description: `Applied payment ${params.paymentNumber} of $${params.amount.toFixed(2)} to invoice ${params.invoiceNumber} for ${params.customerName}`,
     metadata: {
-      planName: params.planName,
-      changes: params.changes,
+      paymentNumber: params.paymentNumber,
+      amount: params.amount,
+      customerName: params.customerName,
+      invoiceNumber: params.invoiceNumber,
+    },
+    organizationId: params.organizationId,
+    ipAddress: params.ipAddress,
+  })
+}
+
+/**
+ * Create audit log for customer creation
+ */
+export async function logCustomerCreated(params: {
+  customerId: string
+  customerName: string
+  createdBy: {
+    id: string
+    name: string
+    email: string
+  }
+  organizationId: string
+  ipAddress?: string
+}) {
+  return createAuditLog({
+    userId: params.createdBy.id,
+    userName: params.createdBy.name,
+    userEmail: params.createdBy.email,
+    action: 'customer_created',
+    entityType: 'customer',
+    entityId: params.customerId,
+    description: `Created customer ${params.customerName}`,
+    metadata: {
+      customerName: params.customerName,
     },
     organizationId: params.organizationId,
     ipAddress: params.ipAddress,
