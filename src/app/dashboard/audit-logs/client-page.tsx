@@ -61,6 +61,7 @@ import {
   type AuditLogFilters,
 } from '@/app/actions/audit-logs'
 import type { AuditAction, EntityType } from '@/lib/audit-log'
+import type { Prisma } from '@prisma/client'
 
 interface AuditLog {
   id: string
@@ -72,7 +73,7 @@ interface AuditLog {
   entityType: string
   entityId: string | null
   description: string
-  metadata: Record<string, unknown> | null
+  metadata: Prisma.JsonValue | null
   ipAddress: string | null
   userAgent: string | null
 }
