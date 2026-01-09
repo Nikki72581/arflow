@@ -1,31 +1,64 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Briefcase, Calendar, Mail, Phone, MapPin, Building2, Crown, Pencil, Activity, Hash } from 'lucide-react'
+import {
+  ArrowLeft,
+  Building2,
+  Calendar,
+  FileText,
+  Globe,
+  Hash,
+  Mail,
+  MapPin,
+  Phone,
+  Receipt,
+  ShieldCheck,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { EmptyState } from '@/components/ui/empty-state'
 import { getClient } from '@/app/actions/clients'
-import { getTerritories } from '@/app/actions/territories'
-import { ProjectFormDialog } from '@/components/projects/project-form-dialog'
-import { ProjectActions } from '@/components/projects/project-actions'
-import { ClientFormDialog } from '@/components/clients/client-form-dialog'
-import { formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 export const dynamic = 'force-dynamic'
 async function ClientDetails({ clientId }: { clientId: string }) {
-  const [result, territoriesResult] = await Promise.all([
-    getClient(clientId),
-    getTerritories()
-  ])
+  const result = await getClient(clientId)
 
   if (!result.success || !result.data) {
     notFound()
   }
 
-  const client = result.data
-  const territories = territoriesResult.success ? territoriesResult.data : []
+  const customer = result.data
+  const billingAddress = [
+    customer.billingAddress1,
+    customer.billingAddress2,
+    customer.billingCity,
+    customer.billingState,
+    customer.billingZip,
+    customer.billingCountry,
+  ]
+    .filter(Boolean)
+    .join(', ')
+  const shippingAddress = [
+    customer.shippingAddress1,
+    customer.shippingAddress2,
+    customer.shippingCity,
+    customer.shippingState,
+    customer.shippingZip,
+    customer.shippingCountry,
+  ]
+    .filter(Boolean)
+    .join(', ')
+
+  const statusVariant =
+    customer.status === 'ACTIVE'
+      ? 'success'
+      : customer.status === 'ON_HOLD'
+      ? 'warning'
+      : customer.status === 'COLLECTIONS'
+      ? 'destructive'
+      : 'secondary'
 
   return (
     <div className="space-y-6">
@@ -40,96 +73,54 @@ async function ClientDetails({ clientId }: { clientId: string }) {
             </Link>
             <div>
               <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-purple-600 to-purple-500 bg-clip-text text-transparent">
-                {client.name}
+                {customer.companyName}
               </h1>
               <p className="text-muted-foreground">
-                Client since {formatDate(client.createdAt)}
+                Customer since {formatDate(customer.createdAt)}
               </p>
             </div>
           </div>
         </div>
-        <ClientFormDialog
-          client={client}
-          territories={territories}
-          trigger={
-            <Button variant="outline">
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit Client
-            </Button>
-          }
-        />
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        {/* Client Information */}
+        {/* Customer Information */}
         <Card className="md:col-span-1">
           <CardHeader>
-            <CardTitle>Client Information</CardTitle>
+            <CardTitle>Customer Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-start gap-3">
-              <Activity className="h-4 w-4 text-muted-foreground mt-0.5" />
+              <ShieldCheck className="h-4 w-4 text-muted-foreground mt-0.5" />
               <div className="space-y-1">
                 <p className="text-sm font-medium">Status</p>
-                <Badge
-                  variant={
-                    (client as any).status === 'ACTIVE' ? 'success' :
-                    (client as any).status === 'PROSPECTIVE' ? 'info' :
-                    (client as any).status === 'INACTIVE' ? 'secondary' :
-                    'outline'
-                  }
-                >
-                  {(client as any).status === 'ACTIVE' ? 'Active' :
-                   (client as any).status === 'INACTIVE' ? 'Inactive' :
-                   (client as any).status === 'PROSPECTIVE' ? 'Prospective' :
-                   (client as any).status === 'CHURNED' ? 'Churned' :
-                   'Active'}
+                <Badge variant={statusVariant}>
+                  {customer.status.replace('_', ' ')}
                 </Badge>
               </div>
             </div>
 
-            <div className="flex items-start gap-3">
-              <Crown className="h-4 w-4 text-muted-foreground mt-0.5" />
-              <div className="space-y-1">
-                <p className="text-sm font-medium">Customer Tier</p>
-                <Badge
-                  variant={
-                    client.tier === 'ENTERPRISE' ? 'default' :
-                    client.tier === 'VIP' ? 'secondary' :
-                    client.tier === 'NEW' ? 'outline' :
-                    'outline'
-                  }
-                >
-                  {client.tier === 'STANDARD' ? 'Standard' :
-                   client.tier === 'VIP' ? 'VIP' :
-                   client.tier === 'NEW' ? 'New Customer' :
-                   client.tier === 'ENTERPRISE' ? 'Enterprise' :
-                   client.tier}
-                </Badge>
-              </div>
-            </div>
-
-            {(client as any).clientId && (
+            {customer.customerNumber && (
               <div className="flex items-start gap-3">
                 <Hash className="h-4 w-4 text-muted-foreground mt-0.5" />
                 <div className="space-y-1">
-                  <p className="text-sm font-medium">Client ID</p>
-                  <p className="text-sm text-muted-foreground font-mono">{(client as any).clientId}</p>
+                  <p className="text-sm font-medium">Customer Number</p>
+                  <p className="text-sm text-muted-foreground font-mono">{customer.customerNumber}</p>
                 </div>
               </div>
             )}
 
-            {client.territory && (
+            {customer.contactName && (
               <div className="flex items-start gap-3">
                 <Building2 className="h-4 w-4 text-muted-foreground mt-0.5" />
                 <div className="space-y-1">
-                  <p className="text-sm font-medium">Territory</p>
-                  <p className="text-sm text-muted-foreground">{client.territory.name}</p>
+                  <p className="text-sm font-medium">Primary Contact</p>
+                  <p className="text-sm text-muted-foreground">{customer.contactName}</p>
                 </div>
               </div>
             )}
 
-            {client.email && (
+            {customer.email && (
               <>
                 <Separator className="bg-purple-500/20" />
                 <div className="flex items-start gap-3">
@@ -137,125 +128,218 @@ async function ClientDetails({ clientId }: { clientId: string }) {
                   <div className="space-y-1">
                     <p className="text-sm font-medium">Email</p>
                     <a
-                      href={`mailto:${client.email}`}
+                      href={`mailto:${customer.email}`}
                       className="text-sm text-muted-foreground hover:underline"
                     >
-                      {client.email}
+                      {customer.email}
                     </a>
                   </div>
                 </div>
               </>
             )}
 
-            {client.phone && (
+            {customer.phone && (
               <div className="flex items-start gap-3">
                 <Phone className="h-4 w-4 text-muted-foreground mt-0.5" />
                 <div className="space-y-1">
                   <p className="text-sm font-medium">Phone</p>
                   <a
-                    href={`tel:${client.phone}`}
+                    href={`tel:${customer.phone}`}
                     className="text-sm text-muted-foreground hover:underline"
                   >
-                    {client.phone}
+                    {customer.phone}
                   </a>
                 </div>
               </div>
             )}
 
-            {client.address && (
+            {customer.website && (
               <div className="flex items-start gap-3">
-                <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+                <Globe className="h-4 w-4 text-muted-foreground mt-0.5" />
                 <div className="space-y-1">
-                  <p className="text-sm font-medium">Address</p>
-                  <p className="text-sm text-muted-foreground">{client.address}</p>
+                  <p className="text-sm font-medium">Website</p>
+                  <a
+                    href={customer.website}
+                    className="text-sm text-muted-foreground hover:underline"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {customer.website}
+                  </a>
                 </div>
               </div>
             )}
 
-            {client.notes && (
+            {billingAddress && (
+              <div className="flex items-start gap-3">
+                <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Billing Address</p>
+                  <p className="text-sm text-muted-foreground">{billingAddress}</p>
+                </div>
+              </div>
+            )}
+
+            {shippingAddress && (
+              <div className="flex items-start gap-3">
+                <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Shipping Address</p>
+                  <p className="text-sm text-muted-foreground">{shippingAddress}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-start gap-3">
+              <Receipt className="h-4 w-4 text-muted-foreground mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Balance</p>
+                <p className="text-sm text-muted-foreground">
+                  {formatCurrency(customer.currentBalance)}
+                </p>
+                {customer.creditLimit !== null && (
+                  <p className="text-xs text-muted-foreground">
+                    Credit limit: {formatCurrency(customer.creditLimit || 0)}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {customer.paymentTerms && (
+              <div className="flex items-start gap-3">
+                <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Payment Terms</p>
+                  <p className="text-sm text-muted-foreground">{customer.paymentTerms}</p>
+                </div>
+              </div>
+            )}
+
+            {customer.externalSystem && (
+              <div className="flex items-start gap-3">
+                <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Integration Source</p>
+                  <p className="text-sm text-muted-foreground">
+                    {customer.externalSystem} {customer.externalId ? `(ID: ${customer.externalId})` : ''}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {customer.notes && (
               <>
                 <Separator className="bg-purple-500/20" />
                 <div className="space-y-1">
                   <p className="text-sm font-medium">Notes</p>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{client.notes}</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{customer.notes}</p>
                 </div>
               </>
             )}
           </CardContent>
         </Card>
 
-        {/* Projects */}
+        {/* Recent Invoices */}
         <Card className="md:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <CardTitle>Projects</CardTitle>
-            <ProjectFormDialog
-              clients={[client]}
-              defaultClientId={client.id}
-            />
+          <CardHeader>
+            <CardTitle>Recent Invoices</CardTitle>
           </CardHeader>
           <CardContent>
-            {client.projects.length === 0 ? (
+            {customer.arDocuments.length === 0 ? (
               <EmptyState
-                icon={Briefcase}
-                title="No projects yet"
-                description="Create a project to start tracking commissions for this client."
+                icon={FileText}
+                title="No invoices yet"
+                description="Invoices will appear here once they are created or synced."
               />
             ) : (
               <div className="space-y-3">
-                {client.projects.map((project) => (
+                {customer.arDocuments.map((doc) => (
                   <div
-                    key={project.id}
+                    key={doc.id}
                     className="flex items-center justify-between rounded-lg border p-4"
                   >
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <Link
-                          href={`/dashboard/projects/${project.id}`}
-                          className="font-medium hover:underline"
-                        >
-                          {project.name}
-                        </Link>
+                        <span className="font-medium">{doc.documentNumber}</span>
                         <Badge
                           variant={
-                            project.status === 'active'
-                              ? 'default'
-                              : project.status === 'completed'
-                              ? 'secondary'
-                              : 'outline'
+                            doc.status === 'OPEN'
+                              ? 'info'
+                              : doc.status === 'PARTIAL'
+                              ? 'warning'
+                              : doc.status === 'PAID'
+                              ? 'success'
+                              : 'secondary'
                           }
                         >
-                          {project.status}
+                          {doc.status.replace('_', ' ')}
                         </Badge>
+                        <Badge variant="outline">{doc.documentType.replace('_', ' ')}</Badge>
                       </div>
-                      {project.description && (
-                        <p className="text-sm text-muted-foreground">
-                          {project.description}
-                        </p>
+                      {doc.description && (
+                        <p className="text-sm text-muted-foreground">{doc.description}</p>
                       )}
                       <div className="flex items-center gap-4 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {formatDate(project.createdAt)}
+                          {formatDate(doc.documentDate)}
                         </span>
-                        {project.commissionPlans.length > 0 && (
-                          <span>
-                            {project.commissionPlans.length} commission{' '}
-                            {project.commissionPlans.length === 1 ? 'plan' : 'plans'}
-                          </span>
-                        )}
+                        <span>{formatCurrency(doc.totalAmount)}</span>
                       </div>
                     </div>
-                    <ProjectActions
-                      project={{
-                        ...project,
-                        status: project.status as 'active' | 'completed' | 'cancelled',
-                        client,
-                        _count: {
-                          salesTransactions: project.commissionPlans.length,
-                        },
-                      }}
-                      clients={[client]}
-                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Payments */}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>Recent Payments</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {customer.payments.length === 0 ? (
+              <EmptyState
+                icon={Receipt}
+                title="No payments yet"
+                description="Payments will appear here once they are recorded."
+              />
+            ) : (
+              <div className="space-y-3">
+                {customer.payments.map((payment) => (
+                  <div
+                    key={payment.id}
+                    className="flex items-center justify-between rounded-lg border p-4"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{payment.paymentNumber}</span>
+                        <Badge
+                          variant={
+                            payment.status === 'APPLIED'
+                              ? 'success'
+                              : payment.status === 'PENDING'
+                              ? 'warning'
+                              : 'secondary'
+                          }
+                        >
+                          {payment.status}
+                        </Badge>
+                        <Badge variant="outline">{payment.paymentMethod.replace('_', ' ')}</Badge>
+                      </div>
+                      {payment.notes && (
+                        <p className="text-sm text-muted-foreground">{payment.notes}</p>
+                      )}
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {formatDate(payment.paymentDate)}
+                        </span>
+                        <span>{formatCurrency(payment.amount)}</span>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
