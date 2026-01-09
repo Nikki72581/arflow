@@ -39,6 +39,8 @@ if (baseDatabaseUrl && schemaName) {
   process.env.DATABASE_URL = appendSchemaToUrl(baseDatabaseUrl, schemaName)
 }
 
-execSync('prisma migrate deploy', { stdio: 'inherit', env: process.env })
+// Use db push instead of migrate deploy for now (ARFlow initial setup)
+// This will sync the schema without requiring migration files
+execSync('prisma db push --accept-data-loss', { stdio: 'inherit', env: process.env })
 execSync('prisma generate', { stdio: 'inherit', env: process.env })
 execSync('next build', { stdio: 'inherit', env: process.env })
