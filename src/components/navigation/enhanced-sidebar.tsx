@@ -5,23 +5,16 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard,
-  ShoppingCart,
   Users,
-  FolderKanban,
-  DollarSign,
   CheckCircle,
-  CreditCard,
   FileText,
   BarChart3,
-  User,
   Settings,
   Shield,
   FileSearch,
   HelpCircle,
   ChevronDown,
   ChevronRight,
-  Database,
-  Receipt,
   Plug,
   ChevronLeft,
   Menu,
@@ -65,51 +58,10 @@ const navigation: NavItem[] = [
     adminOnly: true,
     children: [
       {
-        title: 'Customers',
-        href: '/dashboard/customers',
+        title: 'Clients',
+        href: '/dashboard/clients',
         icon: Users,
         iconColor: 'text-blue-600 dark:text-blue-400',
-      },
-      {
-        title: 'Invoices',
-        href: '/dashboard/invoices',
-        icon: FileText,
-        iconColor: 'text-blue-600 dark:text-blue-400',
-      },
-      {
-        title: 'Payments',
-        href: '/dashboard/payments',
-        icon: CreditCard,
-        iconColor: 'text-emerald-600 dark:text-emerald-400',
-      },
-    ],
-  },
-  {
-    title: 'My Account',
-    icon: User,
-    iconColor: 'text-purple-600 dark:text-purple-400',
-    sectionColor: 'border-purple-500/30',
-    customerOnly: true,
-    children: [
-      {
-        title: 'My Invoices',
-        href: '/dashboard/portal/invoices',
-        icon: FileText,
-        iconColor: 'text-purple-600 dark:text-purple-400',
-        badge: 'openInvoicesCount',
-        badgeVariant: 'info',
-      },
-      {
-        title: 'Payment History',
-        href: '/dashboard/portal/payments',
-        icon: CreditCard,
-        iconColor: 'text-emerald-600 dark:text-emerald-400',
-      },
-      {
-        title: 'Account Summary',
-        href: '/dashboard/portal/summary',
-        icon: BarChart3,
-        iconColor: 'text-cyan-600 dark:text-cyan-400',
       },
     ],
   },
@@ -202,7 +154,7 @@ export function EnhancedSidebar({
         }
       }
     }
-    return ['AR Management', 'My Account', 'Administration']
+    return ['AR Management', 'Administration']
   })
 
   // Persist collapsed state and update CSS variable
