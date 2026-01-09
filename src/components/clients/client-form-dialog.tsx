@@ -23,6 +23,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
 import { createClient, updateClient } from '@/app/actions/clients'
 import type { Customer } from '@/lib/types'
 
@@ -146,15 +152,15 @@ export function ClientFormDialog({
               </DialogDescription>
             </DialogHeader>
 
-          <div className="grid gap-4 py-4 sm:grid-cols-2">
+          <div className="grid gap-6 py-4">
             {error && (
-              <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive sm:col-span-2">
+              <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
                 {error}
               </div>
             )}
 
             {isEdit && client?.externalSystem && (
-              <div className="rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3 text-sm sm:col-span-2">
+              <div className="rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3 text-sm">
                 <p className="font-medium text-blue-900 dark:text-blue-100">Integration Source</p>
                 <p className="text-blue-700 dark:text-blue-300 text-xs mt-1">
                   This client was created from {client.externalSystem}
@@ -163,230 +169,278 @@ export function ClientFormDialog({
               </div>
             )}
 
-            <div className="grid gap-2">
-              <Label htmlFor="companyName">
-                Company name <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="companyName"
-                name="companyName"
-                data-testid="client-name-input"
-                defaultValue={client?.companyName}
-                placeholder="Acme Corporation"
-                required
-              />
-              {error && error.includes('companyName') && (
-                <p className="text-sm text-destructive" data-testid="client-name-error">Company name is required</p>
-              )}
+            {/* Basic Information Section */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                Basic Information
+              </h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2 sm:col-span-2">
+                  <Label htmlFor="companyName">
+                    Company name <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="companyName"
+                    name="companyName"
+                    data-testid="client-name-input"
+                    defaultValue={client?.companyName}
+                    placeholder="Acme Corporation"
+                    required
+                  />
+                  {error && error.includes('companyName') && (
+                    <p className="text-sm text-destructive" data-testid="client-name-error">Company name is required</p>
+                  )}
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="customerNumber">Customer number</Label>
+                  <Input
+                    id="customerNumber"
+                    name="customerNumber"
+                    defaultValue={client?.customerNumber || ''}
+                    placeholder="CUST-1001"
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select value={status} onValueChange={(value: 'ACTIVE' | 'INACTIVE' | 'ON_HOLD' | 'COLLECTIONS') => setStatus(value)}>
+                    <SelectTrigger data-testid="client-status-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ACTIVE" data-testid="client-status-active">Active</SelectItem>
+                      <SelectItem value="INACTIVE" data-testid="client-status-inactive">Inactive</SelectItem>
+                      <SelectItem value="ON_HOLD" data-testid="client-status-on-hold">On hold</SelectItem>
+                      <SelectItem value="COLLECTIONS" data-testid="client-status-collections">Collections</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="contactName">Primary contact</Label>
-              <Input
-                id="contactName"
-                name="contactName"
-                defaultValue={client?.contactName || ''}
-                placeholder="Alex Johnson"
-              />
+            {/* Contact Information Section */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                Contact Information
+              </h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="contactName">Primary contact</Label>
+                  <Input
+                    id="contactName"
+                    name="contactName"
+                    defaultValue={client?.contactName || ''}
+                    placeholder="Alex Johnson"
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    data-testid="client-email-input"
+                    defaultValue={client?.email || ''}
+                    placeholder="contact@acme.com"
+                  />
+                  {error && error.includes('email') && (
+                    <p className="text-sm text-destructive" data-testid="client-email-error">Please enter a valid email</p>
+                  )}
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    data-testid="client-phone-input"
+                    defaultValue={client?.phone || ''}
+                    placeholder="(555) 123-4567"
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="website">Website</Label>
+                  <Input
+                    id="website"
+                    name="website"
+                    defaultValue={client?.website || ''}
+                    placeholder="https://acme.com"
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                data-testid="client-email-input"
-                defaultValue={client?.email || ''}
-                placeholder="contact@acme.com"
-              />
-              {error && error.includes('email') && (
-                <p className="text-sm text-destructive" data-testid="client-email-error">Please enter a valid email</p>
-              )}
+            {/* Financial Information Section */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                Financial Settings
+              </h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="paymentTerms">Payment terms</Label>
+                  <Input
+                    id="paymentTerms"
+                    name="paymentTerms"
+                    defaultValue={client?.paymentTerms || ''}
+                    placeholder="Net 30"
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="creditLimit">Credit limit</Label>
+                  <Input
+                    id="creditLimit"
+                    name="creditLimit"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    defaultValue={client?.creditLimit ?? ''}
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="phone">Phone</Label>
-              <Input
-                id="phone"
-                name="phone"
-                type="tel"
-                data-testid="client-phone-input"
-                defaultValue={client?.phone || ''}
-                placeholder="(555) 123-4567"
-              />
-            </div>
+            {/* Address Sections */}
+            <Accordion type="multiple" className="w-full">
+              <AccordionItem value="billing">
+                <AccordionTrigger className="text-sm font-semibold hover:no-underline">
+                  Billing Address
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="grid gap-4 sm:grid-cols-2 pt-4">
+                    <div className="grid gap-2 sm:col-span-2">
+                      <Label htmlFor="billingAddress1">Street address</Label>
+                      <Input
+                        id="billingAddress1"
+                        name="billingAddress1"
+                        defaultValue={client?.billingAddress1 || ''}
+                        placeholder="123 Main St"
+                      />
+                    </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="website">Website</Label>
-              <Input
-                id="website"
-                name="website"
-                defaultValue={client?.website || ''}
-                placeholder="https://acme.com"
-              />
-            </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="billingCity">City</Label>
+                      <Input
+                        id="billingCity"
+                        name="billingCity"
+                        defaultValue={client?.billingCity || ''}
+                        placeholder="Austin"
+                      />
+                    </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="customerNumber">Customer number</Label>
-              <Input
-                id="customerNumber"
-                name="customerNumber"
-                defaultValue={client?.customerNumber || ''}
-                placeholder="CUST-1001"
-              />
-              <p className="text-xs text-muted-foreground">
-                Reference ID for your records or integrations
-              </p>
-            </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="billingState">State/Province</Label>
+                      <Input
+                        id="billingState"
+                        name="billingState"
+                        defaultValue={client?.billingState || ''}
+                        placeholder="TX"
+                      />
+                    </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="paymentTerms">Payment terms</Label>
-              <Input
-                id="paymentTerms"
-                name="paymentTerms"
-                defaultValue={client?.paymentTerms || ''}
-                placeholder="Net 30"
-              />
-            </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="billingZip">ZIP/Postal code</Label>
+                      <Input
+                        id="billingZip"
+                        name="billingZip"
+                        defaultValue={client?.billingZip || ''}
+                        placeholder="78701"
+                      />
+                    </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="creditLimit">Credit limit</Label>
-              <Input
-                id="creditLimit"
-                name="creditLimit"
-                type="number"
-                min="0"
-                step="0.01"
-                defaultValue={client?.creditLimit ?? ''}
-                placeholder="0.00"
-              />
-            </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="billingCountry">Country</Label>
+                      <Input
+                        id="billingCountry"
+                        name="billingCountry"
+                        defaultValue={client?.billingCountry || ''}
+                        placeholder="USA"
+                      />
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
 
-            <div className="grid gap-2">
-              <Label htmlFor="status">Status</Label>
-              <Select value={status} onValueChange={(value: 'ACTIVE' | 'INACTIVE' | 'ON_HOLD' | 'COLLECTIONS') => setStatus(value)}>
-                <SelectTrigger data-testid="client-status-select">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ACTIVE" data-testid="client-status-active">Active</SelectItem>
-                  <SelectItem value="INACTIVE" data-testid="client-status-inactive">Inactive</SelectItem>
-                  <SelectItem value="ON_HOLD" data-testid="client-status-on-hold">On hold</SelectItem>
-                  <SelectItem value="COLLECTIONS" data-testid="client-status-collections">Collections</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <AccordionItem value="shipping">
+                <AccordionTrigger className="text-sm font-semibold hover:no-underline">
+                  Shipping Address
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="grid gap-4 sm:grid-cols-2 pt-4">
+                    <div className="grid gap-2 sm:col-span-2">
+                      <Label htmlFor="shippingAddress1">Street address</Label>
+                      <Input
+                        id="shippingAddress1"
+                        name="shippingAddress1"
+                        defaultValue={client?.shippingAddress1 || ''}
+                        placeholder="123 Main St"
+                      />
+                    </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="billingAddress1">Billing address</Label>
-              <Input
-                id="billingAddress1"
-                name="billingAddress1"
-                defaultValue={client?.billingAddress1 || ''}
-                placeholder="123 Main St"
-              />
-            </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="shippingCity">City</Label>
+                      <Input
+                        id="shippingCity"
+                        name="shippingCity"
+                        defaultValue={client?.shippingCity || ''}
+                        placeholder="Austin"
+                      />
+                    </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="billingCity">Billing city</Label>
-              <Input
-                id="billingCity"
-                name="billingCity"
-                defaultValue={client?.billingCity || ''}
-                placeholder="Austin"
-              />
-            </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="shippingState">State/Province</Label>
+                      <Input
+                        id="shippingState"
+                        name="shippingState"
+                        defaultValue={client?.shippingState || ''}
+                        placeholder="TX"
+                      />
+                    </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="billingState">Billing state</Label>
-              <Input
-                id="billingState"
-                name="billingState"
-                defaultValue={client?.billingState || ''}
-                placeholder="TX"
-              />
-            </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="shippingZip">ZIP/Postal code</Label>
+                      <Input
+                        id="shippingZip"
+                        name="shippingZip"
+                        defaultValue={client?.shippingZip || ''}
+                        placeholder="78701"
+                      />
+                    </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="billingZip">Billing zip</Label>
-              <Input
-                id="billingZip"
-                name="billingZip"
-                defaultValue={client?.billingZip || ''}
-                placeholder="78701"
-              />
-            </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="shippingCountry">Country</Label>
+                      <Input
+                        id="shippingCountry"
+                        name="shippingCountry"
+                        defaultValue={client?.shippingCountry || ''}
+                        placeholder="USA"
+                      />
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
 
-            <div className="grid gap-2">
-              <Label htmlFor="billingCountry">Billing country</Label>
-              <Input
-                id="billingCountry"
-                name="billingCountry"
-                defaultValue={client?.billingCountry || ''}
-                placeholder="USA"
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="shippingAddress1">Shipping address</Label>
-              <Input
-                id="shippingAddress1"
-                name="shippingAddress1"
-                defaultValue={client?.shippingAddress1 || ''}
-                placeholder="123 Main St"
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="shippingCity">Shipping city</Label>
-              <Input
-                id="shippingCity"
-                name="shippingCity"
-                defaultValue={client?.shippingCity || ''}
-                placeholder="Austin"
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="shippingState">Shipping state</Label>
-              <Input
-                id="shippingState"
-                name="shippingState"
-                defaultValue={client?.shippingState || ''}
-                placeholder="TX"
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="shippingZip">Shipping zip</Label>
-              <Input
-                id="shippingZip"
-                name="shippingZip"
-                defaultValue={client?.shippingZip || ''}
-                placeholder="78701"
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="shippingCountry">Shipping country</Label>
-              <Input
-                id="shippingCountry"
-                name="shippingCountry"
-                defaultValue={client?.shippingCountry || ''}
-                placeholder="USA"
-              />
-            </div>
-
-            <div className="grid gap-2 sm:col-span-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                name="notes"
-                defaultValue={client?.notes || ''}
-                placeholder="Additional notes about this client..."
-                rows={3}
-              />
+            {/* Notes Section */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                Additional Notes
+              </h3>
+              <div className="grid gap-2">
+                <Label htmlFor="notes">Notes</Label>
+                <Textarea
+                  id="notes"
+                  name="notes"
+                  defaultValue={client?.notes || ''}
+                  placeholder="Additional notes about this client..."
+                  rows={3}
+                />
+              </div>
             </div>
           </div>
 
