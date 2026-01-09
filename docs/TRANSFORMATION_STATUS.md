@@ -2,14 +2,25 @@
 
 ## Completed Work
 
-### Salesperson → Customer Mapping (Partial)
+### Phase 1: Global Renaming & Cleanup (COMPLETED ✅)
+- ✅ Updated package.json with ARFlow branding
+- ✅ README.md already had ARFlow content
+- ✅ Replaced all "CommissionFlow" references with "ARFlow" in user-facing code
+- ✅ Updated page metadata across all pages (| ARFlow)
+- ✅ Updated navigation components with ARFlow branding
+- ✅ Updated authentication pages (sign-in, sign-up)
+- ✅ Updated email configuration defaults (arflow.app)
+- ✅ Updated theme provider storage key (arflow-theme)
+- ✅ Updated help and onboarding pages
+
+### Salesperson → Customer Mapping (Partial - From Initial Work)
 - ✅ Renamed `scripts/check-salesperson-mapping.ts` → `scripts/check-customer-mapping.ts`
 - ✅ Updated script to use `AcumaticaCustomerMapping` instead of `AcumaticaSalespersonMapping`
 - ✅ Fixed `src/actions/integrations/acumatica/connection.ts` to remove invalid `invoiceStartDate` field
 - ✅ Updated `src/actions/integrations/acumatica/preview.ts` to use customer mappings
 - ✅ Updated `src/app/dashboard/integrations/page.tsx` with AR-focused language and branding
 
-### Cleanup
+### Cleanup (From Initial Work)
 - ✅ Removed CommissionFlow-specific migration scripts
 - ✅ Removed CommissionFlow-specific test scripts
 - ✅ Removed obsolete sync scripts (to be reimplemented for AR)
@@ -17,6 +28,8 @@
 ### Documentation
 - ✅ Created comprehensive transformation plan in `docs/TRANSFORMATION_PLAN.md`
 - ✅ Created Phase 1 detailed checklist in `docs/PHASE_1_CHECKLIST.md`
+- ✅ Created status tracker in `docs/TRANSFORMATION_STATUS.md`
+- ✅ Created documentation navigation in `docs/README.md`
 
 ---
 
@@ -30,17 +43,22 @@ The build fails because many pages/components reference commission-related model
 
 ## Next Steps (Per Transformation Plan)
 
-### Phase 1: Global Renaming & Cleanup (STARTING NEXT)
+### Phase 1: Global Renaming & Cleanup (COMPLETED ✅)
 See [docs/PHASE_1_CHECKLIST.md](./PHASE_1_CHECKLIST.md) for detailed tasks.
 
-Priority items:
-- [ ] Update package.json with ARFlow branding
-- [ ] Rewrite README.md for ARFlow
-- [ ] Global find/replace: CommissionFlow → ARFlow
-- [ ] Update page metadata and titles
-- [ ] Update sidebar/navigation labels
+Completed items:
+- ✅ Update package.json with ARFlow branding
+- ✅ Rewrite README.md for ARFlow (already done)
+- ✅ Global find/replace: CommissionFlow → ARFlow (all user-facing text)
+- ✅ Update page metadata and titles (all pages now show "| ARFlow")
+- ✅ Update sidebar/navigation labels (ARFlow branding in header and mobile nav)
+- ✅ Update email configuration defaults (arflow.app)
+- ✅ Update auth pages with ARFlow branding
+- ✅ Update theme storage key (arflow-theme)
 
-### Phase 2: Database Schema Changes (PENDING)
+**Commit:** Phase 1 changes committed (commit 12b2e1c)
+
+### Phase 2: Database Schema Changes (NEXT)
 - [ ] Keep: organizations, users tables
 - [ ] Transform: sales_reps → customers
 - [ ] Transform: sales_transactions → ar_documents
