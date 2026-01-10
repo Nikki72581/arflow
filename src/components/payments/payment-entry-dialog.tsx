@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { CreditCard, DollarSign, CheckCircle2, Lock, AlertCircle } from "lucide-react";
+import { CreditCard, DollarSign, CheckCircle2, Lock, AlertCircle, Copy, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,7 +23,9 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { createManualPayment, processCreditCardPayment } from "@/app/actions/payments";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { createManualPayment, createStripeCheckoutSession } from "@/app/actions/payments";
 import { getActiveProvider } from "@/app/actions/payment-gateway-settings";
 import { formatCurrency } from "@/lib/utils";
 import { PaymentMethod } from "@prisma/client";
@@ -43,21 +45,10 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
   const [gatewayEnabled, setGatewayEnabled] = useState(false);
   const [amount, setAmount] = useState(document.balanceDue.toString());
 
-  // Credit card form state
-  const [cardNumber, setCardNumber] = useState("");
-  const [expirationDate, setExpirationDate] = useState("");
-  const [cvv, setCvv] = useState("");
-  const [saveCard, setSaveCard] = useState(false);
-
-  // Billing address state
-  const [billingAddress, setBillingAddress] = useState({
-    firstName: "",
-    lastName: "",
-    address: "",
-    city: "",
-    state: "",
-    zip: "",
-  });
+  // Stripe Checkout mode state
+  const [checkoutMode, setCheckoutMode] = useState<"pay_now" | "generate_link">("pay_now");
+  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   // Other payment methods state
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("CHECK");
@@ -76,33 +67,53 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
     }
   }, [open]);
 
-  // Format card number with spaces
-  const formatCardNumber = (value: string) => {
-    const v = value.replace(/\s+/g, "").replace(/[^0-9]/gi, "");
-    const matches = v.match(/\d{4,16}/g);
-    const match = (matches && matches[0]) || "";
-    const parts = [];
-
-    for (let i = 0, len = match.length; i < len; i += 4) {
-      parts.push(match.substring(i, i + 4));
-    }
-
-    if (parts.length) {
-      return parts.join(" ");
-    } else {
-      return value;
-    }
+  // Copy to clipboard helper
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 2000);
   };
 
-  // Format expiration date as MM/YY
-  const formatExpirationDate = (value: string) => {
-    const v = value.replace(/\s+/g, "").replace(/[^0-9]/gi, "");
-    if (v.length >= 2) {
-      return v.slice(0, 2) + (v.length > 2 ? "/" + v.slice(2, 4) : "");
-    }
-    return v;
-  };
+  // Handle Stripe Checkout submission
+  async function handleCheckoutSubmit() {
+    setLoading(true);
+    setError(null);
 
+    try {
+      const paymentAmount = parseFloat(amount);
+
+      if (paymentAmount <= 0 || paymentAmount > document.balanceDue) {
+        throw new Error(
+          `Payment amount must be between $0.01 and ${formatCurrency(document.balanceDue)}`
+        );
+      }
+
+      const result = await createStripeCheckoutSession({
+        customerId: document.customerId,
+        amount: paymentAmount,
+        documentIds: [document.id],
+        mode: checkoutMode,
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to create checkout session");
+      }
+
+      if (checkoutMode === "pay_now") {
+        // Redirect to Stripe Checkout
+        window.location.href = result.redirectUrl!;
+      } else {
+        // Show generated link
+        setGeneratedLink(result.sessionUrl!);
+      }
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Handle manual payment submission (for "Other Methods" only)
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -117,42 +128,18 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
         );
       }
 
-      if (paymentMethod === "credit_card") {
-        // Process credit card payment
-        const cardNumberClean = cardNumber.replace(/\s/g, "");
-        const expirationMMYY = expirationDate.replace("/", "");
+      // Process manual payment
+      const result = await createManualPayment({
+        customerId: document.customerId,
+        amount: paymentAmount,
+        paymentMethod: selectedMethod,
+        paymentDate: new Date(),
+        referenceNumber: referenceNumber || undefined,
+        documentIds: [document.id],
+      });
 
-        const result = await processCreditCardPayment({
-          customerId: document.customerId,
-          amount: paymentAmount,
-          paymentMethod: "CREDIT_CARD",
-          paymentDate: new Date(),
-          documentIds: [document.id],
-          cardNumber: cardNumberClean,
-          expirationDate: expirationMMYY,
-          cvv: cvv,
-          billingAddress: billingAddress.firstName
-            ? billingAddress
-            : undefined,
-        });
-
-        if (!result.success) {
-          throw new Error(result.error || "Payment failed");
-        }
-      } else {
-        // Process manual payment
-        const result = await createManualPayment({
-          customerId: document.customerId,
-          amount: paymentAmount,
-          paymentMethod: selectedMethod,
-          paymentDate: new Date(),
-          referenceNumber: referenceNumber || undefined,
-          documentIds: [document.id],
-        });
-
-        if (!result.success) {
-          throw new Error(result.error || "Payment failed");
-        }
+      if (!result.success) {
+        throw new Error(result.error || "Payment failed");
       }
 
       // Show success
@@ -254,136 +241,138 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
                   </TabsTrigger>
                 </TabsList>
 
-                {/* Credit Card Tab */}
+                {/* Credit Card Tab - Stripe Checkout */}
                 <TabsContent value="credit_card" className="space-y-4 mt-4">
                   {!gatewayEnabled && (
-                    <div className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
-                      <p className="text-sm text-amber-900 dark:text-amber-100">
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Credit Card Processing Disabled</AlertTitle>
+                      <AlertDescription>
                         Credit card processing is not enabled. Please contact your administrator.
-                      </p>
-                    </div>
+                      </AlertDescription>
+                    </Alert>
                   )}
 
-                  {gatewayEnabled && (
+                  {gatewayEnabled && !generatedLink && (
                     <>
-                      <div className="grid gap-2">
-                        <Label htmlFor="cardNumber">Card Number</Label>
-                        <Input
-                          id="cardNumber"
-                          type="text"
-                          value={cardNumber}
-                          onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-                          placeholder="1234 5678 9012 3456"
-                          maxLength={19}
-                          required
-                        />
+                      {/* Payment Mode Selection */}
+                      <div className="space-y-4">
+                        <Label className="text-base font-semibold">Select Payment Method</Label>
+                        <RadioGroup value={checkoutMode} onValueChange={(v) => setCheckoutMode(v as "pay_now" | "generate_link")}>
+                          <div className="flex items-start space-x-3 p-4 border rounded-lg hover:bg-accent transition-colors cursor-pointer">
+                            <RadioGroupItem value="pay_now" id="pay_now" className="mt-1" />
+                            <div className="flex-1">
+                              <Label htmlFor="pay_now" className="cursor-pointer font-semibold">
+                                Pay Now
+                              </Label>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Redirect to Stripe's secure checkout page and complete payment immediately
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-start space-x-3 p-4 border rounded-lg hover:bg-accent transition-colors cursor-pointer">
+                            <RadioGroupItem value="generate_link" id="generate_link" className="mt-1" />
+                            <div className="flex-1">
+                              <Label htmlFor="generate_link" className="cursor-pointer font-semibold">
+                                Generate Payment Link
+                              </Label>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Create a secure payment link to send to customer via email or copy
+                              </p>
+                            </div>
+                          </div>
+                        </RadioGroup>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="grid gap-2">
-                          <Label htmlFor="expirationDate">Expiration Date</Label>
-                          <Input
-                            id="expirationDate"
-                            type="text"
-                            value={expirationDate}
-                            onChange={(e) => setExpirationDate(formatExpirationDate(e.target.value))}
-                            placeholder="MM/YY"
-                            maxLength={5}
-                            required
-                          />
-                        </div>
-
-                        <div className="grid gap-2">
-                          <Label htmlFor="cvv">CVV</Label>
-                          <div className="relative">
-                            <Input
-                              id="cvv"
-                              type="text"
-                              value={cvv}
-                              onChange={(e) => setCvv(e.target.value.replace(/\D/g, ""))}
-                              placeholder="123"
-                              maxLength={4}
-                              required
-                            />
-                            <Lock className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          </div>
-                        </div>
+                      {/* Action Button */}
+                      <div className="flex gap-3 pt-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setOpen(false)}
+                          disabled={loading}
+                          className="flex-1"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={handleCheckoutSubmit}
+                          disabled={loading}
+                          className="flex-1"
+                        >
+                          {loading ? (
+                            "Processing..."
+                          ) : checkoutMode === "pay_now" ? (
+                            <>
+                              <ExternalLink className="mr-2 h-4 w-4" />
+                              Proceed to Stripe Checkout
+                            </>
+                          ) : (
+                            "Generate Payment Link"
+                          )}
+                        </Button>
                       </div>
 
-                      {/* Billing Address */}
-                      <div className="pt-4 border-t">
-                        <h4 className="text-sm font-semibold mb-3">Billing Address</h4>
-                        <div className="grid gap-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                              <Label htmlFor="firstName">First Name</Label>
-                              <Input
-                                id="firstName"
-                                value={billingAddress.firstName}
-                                onChange={(e) =>
-                                  setBillingAddress({ ...billingAddress, firstName: e.target.value })
-                                }
-                              />
-                            </div>
-                            <div className="grid gap-2">
-                              <Label htmlFor="lastName">Last Name</Label>
-                              <Input
-                                id="lastName"
-                                value={billingAddress.lastName}
-                                onChange={(e) =>
-                                  setBillingAddress({ ...billingAddress, lastName: e.target.value })
-                                }
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid gap-2">
-                            <Label htmlFor="address">Street Address</Label>
-                            <Input
-                              id="address"
-                              value={billingAddress.address}
-                              onChange={(e) =>
-                                setBillingAddress({ ...billingAddress, address: e.target.value })
-                              }
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-3 gap-4">
-                            <div className="grid gap-2">
-                              <Label htmlFor="city">City</Label>
-                              <Input
-                                id="city"
-                                value={billingAddress.city}
-                                onChange={(e) =>
-                                  setBillingAddress({ ...billingAddress, city: e.target.value })
-                                }
-                              />
-                            </div>
-                            <div className="grid gap-2">
-                              <Label htmlFor="state">State</Label>
-                              <Input
-                                id="state"
-                                value={billingAddress.state}
-                                onChange={(e) =>
-                                  setBillingAddress({ ...billingAddress, state: e.target.value })
-                                }
-                                maxLength={2}
-                              />
-                            </div>
-                            <div className="grid gap-2">
-                              <Label htmlFor="zip">ZIP</Label>
-                              <Input
-                                id="zip"
-                                value={billingAddress.zip}
-                                onChange={(e) =>
-                                  setBillingAddress({ ...billingAddress, zip: e.target.value })
-                                }
-                              />
-                            </div>
-                          </div>
-                        </div>
+                      {/* Security Badge */}
+                      <div className="flex items-center justify-center gap-2 p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
+                        <Lock className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        <span className="text-sm text-green-900 dark:text-green-100 font-medium">
+                          Secure payment powered by Stripe
+                        </span>
                       </div>
                     </>
+                  )}
+
+                  {/* Generated Link Display */}
+                  {generatedLink && (
+                    <div className="space-y-4">
+                      <Alert>
+                        <CheckCircle2 className="h-4 w-4" />
+                        <AlertTitle>Payment Link Generated</AlertTitle>
+                        <AlertDescription>
+                          This link is valid for 24 hours. Send it to your customer via email or copy to clipboard.
+                        </AlertDescription>
+                      </Alert>
+
+                      <div className="p-4 bg-muted rounded-lg border">
+                        <p className="text-sm font-medium mb-2">Payment Link:</p>
+                        <p className="text-xs font-mono break-all text-muted-foreground">
+                          {generatedLink}
+                        </p>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          onClick={() => copyToClipboard(generatedLink)}
+                          className="flex-1"
+                        >
+                          {copySuccess ? (
+                            <>
+                              <CheckCircle2 className="mr-2 h-4 w-4" />
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="mr-2 h-4 w-4" />
+                              Copy Link
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setGeneratedLink(null);
+                            setOpen(false);
+                            router.refresh();
+                          }}
+                        >
+                          Close
+                        </Button>
+                      </div>
+                    </div>
                   )}
                 </TabsContent>
 
@@ -425,32 +414,25 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
                   </div>
                 </TabsContent>
               </Tabs>
-
-              {/* Security Badge */}
-              {paymentMethod === "credit_card" && gatewayEnabled && (
-                <div className="flex items-center justify-center gap-2 p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
-                  <Lock className="h-4 w-4 text-green-600" />
-                  <span className="text-sm text-green-900 dark:text-green-100 font-medium">
-                    Secure SSL Encrypted Payment
-                  </span>
-                </div>
-              )}
             </div>
 
-            <div className="flex gap-3 pt-4 border-t">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOpen(false)}
-                disabled={loading}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading} className="flex-1">
-                {loading ? "Processing..." : `Pay ${formatCurrency(parseFloat(amount) || 0)}`}
-              </Button>
-            </div>
+            {/* Submit buttons - only shown for "Other Methods" tab */}
+            {paymentMethod === "other" && (
+              <div className="flex gap-3 pt-4 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setOpen(false)}
+                  disabled={loading}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={loading} className="flex-1">
+                  {loading ? "Processing..." : `Pay ${formatCurrency(parseFloat(amount) || 0)}`}
+                </Button>
+              </div>
+            )}
           </form>
         )}
       </DialogContent>

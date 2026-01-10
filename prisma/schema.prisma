@@ -447,6 +447,13 @@ model CustomerPayment {
   cardType               String? // Visa, Mastercard, Amex, etc.
   paymentGatewayProvider PaymentGatewayProvider? // Which gateway processed this payment
 
+  // Stripe Checkout Session tracking
+  stripeCheckoutSessionId String? // Checkout Session ID (cs_...)
+  checkoutSessionStatus   String? // "open", "complete", "expired"
+  checkoutSessionUrl      String? // URL for "Generate Link" mode
+  sessionExpiresAt        DateTime? // When session expires (24h default)
+  checkoutMode            String? // "pay_now" or "generate_link"
+
   // Integration tracking
   sourceType     RecordSourceType @default(MANUAL)
   externalSystem String?
@@ -464,6 +471,7 @@ model CustomerPayment {
   @@index([paymentDate])
   @@index([status])
   @@index([gatewayTransactionId])
+  @@index([stripeCheckoutSessionId])
   @@map("customer_payments")
 }
 

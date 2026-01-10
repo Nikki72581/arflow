@@ -562,3 +562,150 @@ export async function getPayments({
     totalPages: Math.ceil(total / pageSize),
   };
 }
+
+export async function createStripeCheckoutSession(data: {
+  customerId: string;
+  amount: number;
+  documentIds: string[];
+  mode: "pay_now" | "generate_link";
+}) {
+  const { userId } = await auth();
+  if (!userId) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { clerkId: userId },
+  });
+
+  if (!user || user.role !== "ADMIN") {
+    return { success: false, error: "Only admins can create payment sessions" };
+  }
+
+  try {
+    // Get Stripe credentials
+    const credentials = await getDecryptedStripeCredentials(user.organizationId);
+    if (!credentials) {
+      return {
+        success: false,
+        error: "Stripe not configured. Please contact support.",
+      };
+    }
+
+    // Import checkout module
+    const { createCheckoutSession } = await import("@/lib/payment-gateway/stripe/checkout");
+
+    // Create checkout session
+    const result = await createCheckoutSession(credentials, {
+      organizationId: user.organizationId,
+      customerId: data.customerId,
+      documentIds: data.documentIds,
+      amount: data.amount,
+      mode: data.mode,
+    });
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error || "Failed to create checkout session",
+      };
+    }
+
+    // Return appropriate response based on mode
+    if (data.mode === "pay_now") {
+      return {
+        success: true,
+        redirectUrl: result.sessionUrl, // Client will redirect to this URL
+        sessionId: result.sessionId,
+      };
+    } else {
+      return {
+        success: true,
+        sessionUrl: result.sessionUrl, // Client will display this URL
+        sessionId: result.sessionId,
+      };
+    }
+  } catch (error: any) {
+    console.error("Error creating Stripe checkout session:", error);
+    return { success: false, error: error.message || "Failed to create checkout session" };
+  }
+}
+
+export async function verifyCheckoutSession(sessionId: string) {
+  try {
+    // Find payment by stripeCheckoutSessionId
+    const payment = await prisma.customerPayment.findFirst({
+      where: { stripeCheckoutSessionId: sessionId },
+      include: {
+        customer: true,
+        paymentApplications: {
+          include: {
+            arDocument: true,
+          },
+        },
+      },
+    });
+
+    if (!payment) {
+      return { success: false, error: "Payment not found" };
+    }
+
+    // Check session status
+    if (payment.checkoutSessionStatus === "open") {
+      // Payment is still processing
+      return {
+        success: false,
+        pending: true,
+        error: "Payment is still processing. Please wait a moment and refresh.",
+      };
+    }
+
+    if (payment.checkoutSessionStatus !== "complete") {
+      return {
+        success: false,
+        error: "Payment session is not complete",
+      };
+    }
+
+    // Return payment details
+    return {
+      success: true,
+      paymentNumber: payment.paymentNumber,
+      amount: payment.amount,
+      transactionId: payment.gatewayTransactionId,
+      customerId: payment.customerId,
+      customerName: payment.customer.companyName,
+      paymentDate: payment.paymentDate,
+      documents: payment.paymentApplications.map((app) => ({
+        id: app.arDocument.id,
+        documentNumber: app.arDocument.documentNumber,
+        documentType: app.arDocument.documentType,
+        amountApplied: app.amountApplied,
+      })),
+    };
+  } catch (error: any) {
+    console.error("Error verifying checkout session:", error);
+    return { success: false, error: error.message || "Failed to verify payment" };
+  }
+}
+
+export async function markSessionCancelled(sessionId: string) {
+  try {
+    // Update payment to VOID status if still PENDING
+    const result = await prisma.customerPayment.updateMany({
+      where: {
+        stripeCheckoutSessionId: sessionId,
+        status: "PENDING", // Only update pending payments
+      },
+      data: {
+        checkoutSessionStatus: "expired",
+        status: "VOID",
+      },
+    });
+
+    return { success: true, updated: result.count };
+  } catch (error: any) {
+    console.error("Error marking session as cancelled:", error);
+    return { success: false, error: error.message || "Failed to update session" };
+  }
+}
