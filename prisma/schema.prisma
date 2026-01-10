@@ -147,15 +147,16 @@ model Organization {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  users                User[]
-  customers            Customer[]
-  arDocuments          ArDocument[]
-  payments             CustomerPayment[]
-  paymentApplications  PaymentApplication[]
-  auditLogs            AuditLog[]
-  acumaticaIntegration AcumaticaIntegration?
-  documentTypeSettings DocumentTypeSetting[]
-  paymentTermTypes     PaymentTermType[]
+  users                   User[]
+  customers               Customer[]
+  arDocuments             ArDocument[]
+  payments                CustomerPayment[]
+  paymentApplications     PaymentApplication[]
+  auditLogs               AuditLog[]
+  acumaticaIntegration    AcumaticaIntegration?
+  authorizeNetIntegration AuthorizeNetIntegration?
+  documentTypeSettings    DocumentTypeSetting[]
+  paymentTermTypes        PaymentTermType[]
 
   @@map("organizations")
 }
@@ -432,6 +433,12 @@ model CustomerPayment {
   status         PaymentStatus @default(APPLIED)
   notes          String?
 
+  // Payment Gateway Integration (Authorize.net, etc.)
+  gatewayTransactionId String? // Transaction ID from payment gateway
+  gatewayResponse      Json? // Full gateway response for debugging
+  last4Digits          String? // Last 4 digits of card (for display)
+  cardType             String? // Visa, Mastercard, Amex, etc.
+
   // Integration tracking
   sourceType     RecordSourceType @default(MANUAL)
   externalSystem String?
@@ -448,6 +455,7 @@ model CustomerPayment {
   @@index([customerId])
   @@index([paymentDate])
   @@index([status])
+  @@index([gatewayTransactionId])
   @@map("customer_payments")
 }
 
@@ -626,4 +634,42 @@ model IntegrationSyncLog {
   @@index([integrationId])
   @@index([startedAt])
   @@map("integration_sync_logs")
+}
+
+// ============================================
+// PAYMENT GATEWAY INTEGRATIONS
+// ============================================
+
+model AuthorizeNetIntegration {
+  id             String @id @default(cuid())
+  organizationId String @unique
+
+  // API Credentials
+  apiLoginId           String // API Login ID from Authorize.net
+  encryptedTransactionKey String // Encrypted Transaction Key
+
+  // Environment
+  isProduction Boolean @default(false) // false = sandbox, true = production
+
+  // Settings
+  enabled              Boolean @default(false)
+  lastConnectionTest   DateTime?
+  connectionErrorMessage String?
+
+  // Features
+  enableCustomerPayments Boolean @default(true) // Allow customer portal payments
+  enablePaymentLinks    Boolean @default(false) // Future: One-time payment links
+  enableTerminals       Boolean @default(false) // Future: Hardware terminal support
+
+  // Transaction Settings
+  requireCVV           Boolean @default(true)
+  requireBillingAddress Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("authorize_net_integrations")
 }

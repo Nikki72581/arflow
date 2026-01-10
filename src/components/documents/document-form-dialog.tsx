@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/accordion'
 import { createDocument } from '@/app/actions/documents'
 import { getClients } from '@/app/actions/clients'
+import { getEnabledPaymentTermTypes } from '@/app/actions/payment-term-types'
 import { DocumentType } from '@prisma/client'
 
 interface DocumentFormDialogProps {
@@ -56,9 +57,11 @@ export function DocumentFormDialog({
   const [clients, setClients] = useState<any[]>([])
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
   const [paymentTermInfo, setPaymentTermInfo] = useState<any>(null)
+  const [paymentTerms, setPaymentTerms] = useState<any[]>([])
+  const [selectedPaymentTermId, setSelectedPaymentTermId] = useState<string>('')
   const formRef = useRef<HTMLFormElement>(null)
 
-  // Load clients when dialog opens
+  // Load clients and payment terms when dialog opens
   useEffect(() => {
     if (open) {
       getClients().then((result) => {
@@ -66,18 +69,33 @@ export function DocumentFormDialog({
           setClients(result.data)
         }
       })
+      getEnabledPaymentTermTypes().then((terms) => {
+        setPaymentTerms(terms)
+      })
     }
   }, [open])
 
-  // Calculate due date when customer or document date changes
+  // Calculate due date when customer, payment term, or document date changes
   useEffect(() => {
     if (customerId && documentDate) {
       const customer = clients.find(c => c.id === customerId)
       setSelectedCustomer(customer)
 
-      if (customer?.paymentTerm) {
-        const term = customer.paymentTerm
+      // Determine which payment term to use
+      let term = null
 
+      // If a payment term is explicitly selected, use that
+      if (selectedPaymentTermId) {
+        term = paymentTerms.find(t => t.id === selectedPaymentTermId)
+      }
+      // Otherwise, use customer's default payment term
+      else if (customer?.paymentTerm) {
+        term = customer.paymentTerm
+        // Auto-select the customer's payment term
+        setSelectedPaymentTermId(customer.paymentTermId || '')
+      }
+
+      if (term) {
         // Calculate projected due date
         const docDate = new Date(documentDate)
         const projectedDueDate = new Date(docDate)
@@ -99,7 +117,7 @@ export function DocumentFormDialog({
       setPaymentTermInfo(null)
       setSelectedCustomer(null)
     }
-  }, [customerId, documentDate, clients, dueDateManuallySet])
+  }, [customerId, documentDate, selectedPaymentTermId, clients, paymentTerms, dueDateManuallySet])
 
   // Reset form when dialog closes
   const handleDialogChange = (isOpen: boolean) => {
@@ -114,6 +132,7 @@ export function DocumentFormDialog({
       setDueDateManuallySet(false)
       setSelectedCustomer(null)
       setPaymentTermInfo(null)
+      setSelectedPaymentTermId('')
       setError(null)
       setShowSuccess(false)
     }
@@ -162,6 +181,7 @@ export function DocumentFormDialog({
       description: getString('description'),
       notes: getString('notes'),
       customerNotes: getString('customerNotes'),
+      paymentTermId: selectedPaymentTermId || undefined,
     }
 
     try {
@@ -301,9 +321,9 @@ export function DocumentFormDialog({
               {/* Date Information Section */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                  Date Information
+                  Date & Payment Terms
                 </h3>
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-3">
                   <div className="grid gap-2">
                     <Label htmlFor="documentDate">
                       Document date <span className="text-destructive">*</span>
@@ -315,6 +335,29 @@ export function DocumentFormDialog({
                       onChange={(e) => setDocumentDate(e.target.value)}
                       required
                     />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="paymentTermId">Payment terms</Label>
+                    <Select
+                      value={selectedPaymentTermId}
+                      onValueChange={(value) => {
+                        setSelectedPaymentTermId(value)
+                        setDueDateManuallySet(false) // Allow recalculation
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select payment terms" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">None</SelectItem>
+                        {paymentTerms.map((term) => (
+                          <SelectItem key={term.id} value={term.id}>
+                            {term.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="grid gap-2">

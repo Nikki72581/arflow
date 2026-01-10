@@ -16,6 +16,8 @@ import { Separator } from "@/components/ui/separator";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { DocumentStatus, DocumentType } from "@prisma/client";
+import { EditDocumentDialog } from "@/components/documents/edit-document-dialog";
+import { PaymentEntryDialog } from "@/components/payments/payment-entry-dialog";
 
 interface DocumentDetailViewProps {
   document: any; // Type from getDocument action
@@ -66,6 +68,14 @@ export function DocumentDetailView({ document }: DocumentDetailViewProps) {
               </p>
             </div>
           </div>
+        </div>
+        <div className="flex gap-2">
+          {document.balanceDue > 0 && (
+            <PaymentEntryDialog document={document} />
+          )}
+          {document.sourceType === "MANUAL" && (
+            <EditDocumentDialog document={document} />
+          )}
         </div>
       </div>
 

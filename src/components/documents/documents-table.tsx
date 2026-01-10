@@ -27,6 +27,7 @@ import { getDocuments } from "@/app/actions/documents";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { Search, FileText } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { EditDocumentDialog } from "@/components/documents/edit-document-dialog";
 
 interface DocumentsTableProps {
   documentType: DocumentType;
@@ -180,6 +181,7 @@ export function DocumentsTable({
                 <TableHead className="font-semibold">Due Date</TableHead>
                 <TableHead className="font-semibold text-right">Amount</TableHead>
                 <TableHead className="font-semibold text-right">Balance</TableHead>
+                <TableHead className="font-semibold text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -228,6 +230,11 @@ export function DocumentsTable({
                       </span>
                     ) : (
                       <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {doc.sourceType === "MANUAL" && (
+                      <EditDocumentDialog document={doc} />
                     )}
                   </TableCell>
                 </TableRow>

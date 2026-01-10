@@ -172,6 +172,7 @@ export async function createDocument(data: {
   description?: string;
   notes?: string;
   customerNotes?: string;
+  paymentTermId?: string;
 }) {
   try {
     const { userId } = await auth();
@@ -187,14 +188,32 @@ export async function createDocument(data: {
       return { success: false, error: "Only admins can create documents" };
     }
 
-    // Fetch customer with payment term to auto-calculate due date and discounts
+    // Fetch customer to validate
     const customer = await prisma.customer.findUnique({
       where: { id: data.customerId },
-      include: { paymentTerm: true },
     });
 
     if (!customer) {
       return { success: false, error: "Customer not found" };
+    }
+
+    // Determine which payment term to use
+    let paymentTermToUse = null;
+    let paymentTermIdToStore: string | null = null;
+
+    // If a payment term is explicitly provided, use that
+    if (data.paymentTermId) {
+      paymentTermToUse = await prisma.paymentTermType.findUnique({
+        where: { id: data.paymentTermId },
+      });
+      paymentTermIdToStore = data.paymentTermId;
+    }
+    // Otherwise, use customer's default payment term
+    else if (customer.paymentTermId) {
+      paymentTermToUse = await prisma.paymentTermType.findUnique({
+        where: { id: customer.paymentTermId },
+      });
+      paymentTermIdToStore = customer.paymentTermId;
     }
 
     // Calculate due date and discount info from payment term
@@ -204,8 +223,8 @@ export async function createDocument(data: {
     let discountAvailable: number | undefined;
     let paymentTermSnapshot: any = null;
 
-    if (customer.paymentTerm && !data.dueDate) {
-      const term = customer.paymentTerm;
+    if (paymentTermToUse && !data.dueDate) {
+      const term = paymentTermToUse;
 
       // Calculate due date
       calculatedDueDate = new Date(data.documentDate);
@@ -252,7 +271,7 @@ export async function createDocument(data: {
         sourceType: "MANUAL",
         status: "OPEN",
         // Payment term tracking
-        paymentTermId: customer.paymentTermId,
+        paymentTermId: paymentTermIdToStore,
         appliedPaymentTerm: paymentTermSnapshot,
         earlyPaymentDeadline,
         discountPercentage,
@@ -282,12 +301,15 @@ export async function createDocument(data: {
 export async function updateDocument(
   id: string,
   data: {
+    documentNumber?: string;
     referenceNumber?: string;
+    documentDate?: Date;
     dueDate?: Date;
     description?: string;
     notes?: string;
     customerNotes?: string;
     status?: DocumentStatus;
+    paymentTermId?: string;
   }
 ) {
   const { userId } = await auth();
@@ -303,12 +325,101 @@ export async function updateDocument(
     throw new Error("Unauthorized");
   }
 
+  // Get the existing document
+  const existingDocument = await prisma.arDocument.findFirst({
+    where: {
+      id,
+      organizationId: user.organizationId,
+    },
+  });
+
+  if (!existingDocument) {
+    throw new Error("Document not found");
+  }
+
+  // Only allow editing manual documents
+  if (existingDocument.sourceType !== "MANUAL") {
+    throw new Error(
+      "Cannot edit documents created from integrations. Please update from the source system."
+    );
+  }
+
+  // Prepare update data
+  const updateData: any = {
+    documentNumber: data.documentNumber,
+    referenceNumber: data.referenceNumber,
+    documentDate: data.documentDate,
+    dueDate: data.dueDate,
+    description: data.description,
+    notes: data.notes,
+    customerNotes: data.customerNotes,
+    status: data.status,
+  };
+
+  // Handle payment term updates
+  if (data.paymentTermId !== undefined) {
+    updateData.paymentTermId = data.paymentTermId || null;
+
+    // If payment term is being set/changed and we have a document date
+    if (data.paymentTermId) {
+      const term = await prisma.paymentTermType.findUnique({
+        where: { id: data.paymentTermId },
+      });
+
+      if (term) {
+        const docDate = data.documentDate || existingDocument.documentDate;
+
+        // Recalculate due date if not manually provided
+        if (!data.dueDate) {
+          const calculatedDueDate = new Date(docDate);
+          calculatedDueDate.setDate(calculatedDueDate.getDate() + term.daysDue);
+          updateData.dueDate = calculatedDueDate;
+        }
+
+        // Update discount info
+        if (term.hasDiscount && term.discountDays && term.discountPercentage) {
+          const earlyPaymentDeadline = new Date(docDate);
+          earlyPaymentDeadline.setDate(
+            earlyPaymentDeadline.getDate() + term.discountDays
+          );
+          updateData.earlyPaymentDeadline = earlyPaymentDeadline;
+          updateData.discountPercentage = term.discountPercentage;
+          updateData.discountAvailable =
+            ((data.documentDate ? existingDocument.totalAmount : existingDocument.totalAmount) *
+              term.discountPercentage) /
+            100;
+        } else {
+          updateData.earlyPaymentDeadline = null;
+          updateData.discountPercentage = null;
+          updateData.discountAvailable = null;
+        }
+
+        // Update payment term snapshot
+        updateData.appliedPaymentTerm = {
+          id: term.id,
+          name: term.name,
+          code: term.code,
+          daysDue: term.daysDue,
+          hasDiscount: term.hasDiscount,
+          discountDays: term.discountDays,
+          discountPercentage: term.discountPercentage,
+        };
+      }
+    } else {
+      // Clear payment term data
+      updateData.appliedPaymentTerm = null;
+      updateData.earlyPaymentDeadline = null;
+      updateData.discountPercentage = null;
+      updateData.discountAvailable = null;
+    }
+  }
+
   const document = await prisma.arDocument.update({
     where: {
       id,
       organizationId: user.organizationId,
     },
-    data,
+    data: updateData,
     include: {
       customer: true,
     },
