@@ -300,11 +300,8 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
                         clientSecret={clientSecret}
                         publishableKey={publishableKey}
                         onComplete={() => {
-                          // Payment completed, redirect to success page
-                          setTimeout(() => {
-                            setOpen(false);
-                            router.refresh();
-                          }, 2000);
+                          // Payment completed - Stripe will redirect to success page
+                          // No need to close dialog, the page will navigate
                         }}
                       />
                     </div>

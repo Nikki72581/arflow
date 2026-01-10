@@ -7,6 +7,7 @@ const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/api/webhooks(.*)',
+  '/payment(.*)', // Allow payment success/cancel pages for Stripe redirects
 ]);
 
 const isOnboardingRoute = createRouteMatcher(['/onboarding']);

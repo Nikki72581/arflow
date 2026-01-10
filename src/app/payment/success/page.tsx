@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { verifyCheckoutSession } from "@/app/actions/payments";
 import { formatCurrency } from "@/lib/utils";
+import { PaymentProcessingRefresh } from "@/components/payments/payment-processing-refresh";
 
 interface PageProps {
   searchParams: { session_id?: string };
@@ -18,6 +19,7 @@ async function PaymentSuccessContent({ sessionId }: { sessionId: string }) {
     if (result.pending) {
       return (
         <div className="max-w-2xl mx-auto py-12 px-4">
+          <PaymentProcessingRefresh autoRefresh={true} delayMs={3000} />
           <div className="text-center space-y-6">
             <div className="animate-pulse">
               <div className="h-16 w-16 mx-auto rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
@@ -29,10 +31,10 @@ async function PaymentSuccessContent({ sessionId }: { sessionId: string }) {
               Your payment is being processed. This usually takes just a few seconds.
             </p>
             <p className="text-sm text-muted-foreground">
-              Please wait or refresh the page in a moment.
+              Page will auto-refresh in a moment...
             </p>
             <Button onClick={() => window.location.reload()} variant="outline">
-              Refresh Page
+              Refresh Now
             </Button>
           </div>
         </div>
