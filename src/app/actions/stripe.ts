@@ -282,3 +282,34 @@ export async function getDecryptedStripeCredentials(organizationId: string) {
     requireBillingAddress: settings.requireBillingAddress,
   };
 }
+
+/**
+ * Get Stripe publishable key for client-side use
+ * This is safe to expose to the client
+ */
+export async function getStripePublishableKey() {
+  const { userId } = await auth();
+  if (!userId) {
+    throw new Error("Unauthorized");
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { clerkId: userId },
+  });
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  const settings = await prisma.stripeIntegration.findUnique({
+    where: {
+      organizationId: user.organizationId,
+    },
+  });
+
+  if (!settings || !settings.enabled) {
+    return null;
+  }
+
+  return decryptGatewayCredential(settings.encryptedPublishableKey);
+}

@@ -15,6 +15,7 @@ export interface CheckoutSessionResult {
   success: boolean;
   sessionId?: string;
   sessionUrl?: string;
+  clientSecret?: string; // For embedded checkout
   paymentId?: string;
   error?: string;
 }
@@ -109,7 +110,8 @@ export async function createCheckoutSession(
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
     // Create Checkout Session
-    const session = await stripe.checkout.sessions.create({
+    // Use embedded mode for "pay_now", hosted mode for "generate_link"
+    const sessionConfig: Stripe.Checkout.SessionCreateParams = {
       mode: 'payment',
       payment_method_types: ['card'],
       line_items: [
@@ -126,8 +128,6 @@ export async function createCheckoutSession(
         },
       ],
       customer_email: customer.email || undefined,
-      success_url: `${baseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/payment/cancel?session_id={CHECKOUT_SESSION_ID}`,
       expires_at: Math.floor(sessionExpiresAt.getTime() / 1000), // Unix timestamp
       metadata: {
         organizationId: params.organizationId,
@@ -137,7 +137,21 @@ export async function createCheckoutSession(
         checkoutMode: params.mode,
         paymentNumber: paymentNumber,
       },
-    });
+    };
+
+    // Configure based on checkout mode
+    if (params.mode === 'pay_now') {
+      // Embedded mode - no redirect URLs needed
+      sessionConfig.ui_mode = 'embedded';
+      sessionConfig.return_url = `${baseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`;
+    } else {
+      // Hosted mode - uses success/cancel URLs
+      sessionConfig.ui_mode = 'hosted';
+      sessionConfig.success_url = `${baseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`;
+      sessionConfig.cancel_url = `${baseUrl}/payment/cancel?session_id={CHECKOUT_SESSION_ID}`;
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionConfig);
 
     // Update payment record with session details
     await prisma.customerPayment.update({
@@ -152,6 +166,7 @@ export async function createCheckoutSession(
       success: true,
       sessionId: session.id,
       sessionUrl: session.url || undefined,
+      clientSecret: session.client_secret || undefined, // For embedded mode
       paymentId: payment.id,
     };
   } catch (error) {

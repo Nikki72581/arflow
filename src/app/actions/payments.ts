@@ -613,9 +613,10 @@ export async function createStripeCheckoutSession(data: {
 
     // Return appropriate response based on mode
     if (data.mode === "pay_now") {
+      // For embedded mode, return client secret instead of URL
       return {
         success: true,
-        redirectUrl: result.sessionUrl, // Client will redirect to this URL
+        clientSecret: result.clientSecret, // For embedded checkout
         sessionId: result.sessionId,
       };
     } else {

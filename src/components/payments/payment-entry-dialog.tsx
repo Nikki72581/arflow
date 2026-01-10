@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { CreditCard, DollarSign, CheckCircle2, Lock, AlertCircle, Copy, ExternalLink } from "lucide-react";
+import { CreditCard, DollarSign, CheckCircle2, Lock, AlertCircle, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,13 +22,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { createManualPayment, createStripeCheckoutSession } from "@/app/actions/payments";
 import { getActiveProvider } from "@/app/actions/payment-gateway-settings";
+import { getStripePublishableKey } from "@/app/actions/stripe";
 import { formatCurrency } from "@/lib/utils";
 import { PaymentMethod } from "@prisma/client";
+import { StripeEmbeddedCheckout } from "./stripe-embedded-checkout";
 
 interface PaymentEntryDialogProps {
   document: any;
@@ -50,6 +51,10 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
 
+  // Embedded checkout state
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [publishableKey, setPublishableKey] = useState<string | null>(null);
+
   // Other payment methods state
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("CHECK");
   const [referenceNumber, setReferenceNumber] = useState("");
@@ -57,13 +62,18 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
   // Check active payment gateway when dialog opens
   useEffect(() => {
     if (open) {
-      getActiveProvider().then((activeProvider) => {
-        const hasActiveProvider = activeProvider !== null;
-        setGatewayEnabled(hasActiveProvider);
-        if (!hasActiveProvider) {
-          setPaymentMethod("other");
+      Promise.all([getActiveProvider(), getStripePublishableKey()]).then(
+        ([activeProvider, pubKey]) => {
+          const hasActiveProvider = activeProvider !== null;
+          setGatewayEnabled(hasActiveProvider);
+          if (pubKey) {
+            setPublishableKey(pubKey);
+          }
+          if (!hasActiveProvider) {
+            setPaymentMethod("other");
+          }
         }
-      });
+      );
     }
   }, [open]);
 
@@ -100,8 +110,12 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
       }
 
       if (checkoutMode === "pay_now") {
-        // Redirect to Stripe Checkout
-        window.location.href = result.redirectUrl!;
+        // Show embedded checkout
+        if (result.clientSecret) {
+          setClientSecret(result.clientSecret);
+        } else {
+          throw new Error("No client secret returned from checkout session");
+        }
       } else {
         // Show generated link
         setGeneratedLink(result.sessionUrl!);
@@ -158,8 +172,19 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
     }
   }
 
+  // Reset state when dialog closes
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      // Reset embedded checkout state
+      setClientSecret(null);
+      setGeneratedLink(null);
+      setError(null);
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       {trigger ? (
         <DialogTrigger asChild>{trigger}</DialogTrigger>
       ) : (
@@ -170,7 +195,7 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
           </Button>
         </DialogTrigger>
       )}
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className={clientSecret ? "sm:max-w-[800px]" : "sm:max-w-[600px]"}>
         {showSuccess ? (
           <div className="flex flex-col items-center justify-center py-12">
             <div className="animate-in zoom-in duration-500">
@@ -253,7 +278,39 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
                     </Alert>
                   )}
 
-                  {gatewayEnabled && !generatedLink && (
+                  {/* Show Embedded Checkout when client secret is available */}
+                  {gatewayEnabled && clientSecret && publishableKey && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between pb-4 border-b">
+                        <div>
+                          <h3 className="text-lg font-semibold">Complete Your Payment</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Securely pay {formatCurrency(parseFloat(amount))} with your card
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setClientSecret(null)}
+                        >
+                          Back
+                        </Button>
+                      </div>
+                      <StripeEmbeddedCheckout
+                        clientSecret={clientSecret}
+                        publishableKey={publishableKey}
+                        onComplete={() => {
+                          // Payment completed, redirect to success page
+                          setTimeout(() => {
+                            setOpen(false);
+                            router.refresh();
+                          }, 2000);
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {gatewayEnabled && !generatedLink && !clientSecret && (
                     <>
                       {/* Payment Mode Selection */}
                       <div className="space-y-4">
@@ -266,7 +323,7 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
                                 Pay Now
                               </Label>
                               <p className="text-sm text-muted-foreground mt-1">
-                                Redirect to Stripe's secure checkout page and complete payment immediately
+                                Complete payment immediately using Stripe's secure embedded checkout
                               </p>
                             </div>
                           </div>
@@ -305,8 +362,8 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
                             "Processing..."
                           ) : checkoutMode === "pay_now" ? (
                             <>
-                              <ExternalLink className="mr-2 h-4 w-4" />
-                              Proceed to Stripe Checkout
+                              <CreditCard className="mr-2 h-4 w-4" />
+                              Proceed to Checkout
                             </>
                           ) : (
                             "Generate Payment Link"
