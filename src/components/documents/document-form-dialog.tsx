@@ -350,7 +350,6 @@ export function DocumentFormDialog({
                         <SelectValue placeholder="Select payment terms" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
                         {paymentTerms.map((term) => (
                           <SelectItem key={term.id} value={term.id}>
                             {term.name}
