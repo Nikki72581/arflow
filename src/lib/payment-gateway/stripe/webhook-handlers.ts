@@ -9,8 +9,24 @@ export async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session
 ) {
   const sessionId = session.id;
-  const paymentIntentId = session.payment_intent as string;
-  const metadata = session.metadata!;
+
+  // Safely extract payment intent ID
+  const paymentIntentId = typeof session.payment_intent === 'string'
+    ? session.payment_intent
+    : session.payment_intent?.id;
+
+  if (!paymentIntentId) {
+    console.error('No payment intent ID found for session:', sessionId);
+    return;
+  }
+
+  // Validate metadata exists and has required fields
+  if (!session.metadata?.documentIds) {
+    console.error('Missing metadata or documentIds for session:', sessionId);
+    return;
+  }
+
+  const metadata = session.metadata;
 
   console.log('Processing checkout.session.completed:', sessionId);
 
@@ -31,69 +47,83 @@ export async function handleCheckoutSessionCompleted(
   }
 
   try {
-    // Get payment intent details for card information
-    const paymentDetails = session.payment_method_details as any;
-    const last4 = paymentDetails?.card?.last4 || null;
-    const cardBrand = paymentDetails?.card?.brand || null;
+    // Parse and validate document IDs
+    const documentIds = metadata.documentIds.split(',').filter(id => id.trim());
 
-    // Update payment record to APPLIED status
-    await prisma.customerPayment.update({
-      where: { id: payment.id },
-      data: {
-        status: 'APPLIED',
-        checkoutSessionStatus: 'complete',
-        gatewayTransactionId: paymentIntentId,
-        gatewayResponse: session as any,
-        last4Digits: last4,
-        cardType: cardBrand?.toUpperCase(),
-      },
-    });
-
-    // Apply payment to documents
-    const documentIds = metadata.documentIds.split(',');
-    let remainingAmount = payment.amount;
-
-    for (const documentId of documentIds) {
-      if (remainingAmount <= 0) break;
-
-      const document = await prisma.arDocument.findUnique({
-        where: { id: documentId },
-      });
-
-      if (!document) {
-        console.warn('Document not found:', documentId);
-        continue;
-      }
-
-      const amountToApply = Math.min(remainingAmount, document.balanceDue);
-
-      // Create payment application
-      await prisma.paymentApplication.create({
-        data: {
-          organizationId: payment.organizationId,
-          paymentId: payment.id,
-          arDocumentId: documentId,
-          amountApplied: amountToApply,
-        },
-      });
-
-      // Update document
-      const newBalance = document.balanceDue - amountToApply;
-      const newAmountPaid = document.amountPaid + amountToApply;
-      const newStatus = newBalance === 0 ? 'PAID' : newAmountPaid > 0 ? 'PARTIAL' : document.status;
-
-      await prisma.arDocument.update({
-        where: { id: documentId },
-        data: {
-          balanceDue: newBalance,
-          amountPaid: newAmountPaid,
-          status: newStatus,
-          paidDate: newBalance === 0 ? new Date() : null,
-        },
-      });
-
-      remainingAmount -= amountToApply;
+    if (documentIds.length === 0) {
+      throw new Error('No valid document IDs found in metadata');
     }
+
+    // Use a transaction to ensure all updates are atomic
+    await prisma.$transaction(async (tx) => {
+      // Update payment record to APPLIED status
+      // Note: Card details (last4, brand) are set during checkout session creation
+      await tx.customerPayment.update({
+        where: { id: payment.id },
+        data: {
+          status: 'APPLIED',
+          checkoutSessionStatus: 'complete',
+          gatewayTransactionId: paymentIntentId,
+          gatewayResponse: JSON.parse(JSON.stringify(session)),
+        },
+      });
+
+      // Apply payment to documents
+      let remainingAmount = payment.amount;
+
+      for (const documentId of documentIds) {
+        if (remainingAmount <= 0) break;
+
+        const document = await tx.arDocument.findUnique({
+          where: { id: documentId },
+        });
+
+        if (!document) {
+          console.warn('Document not found:', documentId);
+          continue;
+        }
+
+        const amountToApply = Math.min(remainingAmount, document.balanceDue);
+
+        if (amountToApply <= 0) {
+          continue;
+        }
+
+        // Create payment application
+        await tx.paymentApplication.create({
+          data: {
+            organizationId: payment.organizationId,
+            paymentId: payment.id,
+            arDocumentId: documentId,
+            amountApplied: amountToApply,
+          },
+        });
+
+        // Update document
+        const newBalance = document.balanceDue - amountToApply;
+        const newAmountPaid = document.amountPaid + amountToApply;
+
+        // Determine new status
+        let newStatus = document.status;
+        if (newBalance === 0) {
+          newStatus = 'PAID';
+        } else if (newAmountPaid > 0) {
+          newStatus = 'PARTIAL';
+        }
+
+        await tx.arDocument.update({
+          where: { id: documentId },
+          data: {
+            balanceDue: newBalance,
+            amountPaid: newAmountPaid,
+            status: newStatus,
+            ...(newBalance === 0 && { paidDate: new Date() }),
+          },
+        });
+
+        remainingAmount -= amountToApply;
+      }
+    });
 
     console.log('Checkout session completed successfully:', sessionId);
   } catch (error) {
@@ -144,15 +174,21 @@ export async function handlePaymentIntentFailed(
   console.log('Processing payment_intent.payment_failed:', paymentIntentId);
 
   try {
+    // Build search criteria - only add checkoutSessionId if it exists
+    const whereConditions: any[] = [
+      { gatewayTransactionId: paymentIntentId },
+    ];
+
+    if (paymentIntent.metadata?.checkoutSessionId) {
+      whereConditions.push({
+        stripeCheckoutSessionId: paymentIntent.metadata.checkoutSessionId,
+      });
+    }
+
     // Find payment by gateway transaction ID or checkout session
     const payment = await prisma.customerPayment.findFirst({
       where: {
-        OR: [
-          { gatewayTransactionId: paymentIntentId },
-          {
-            stripeCheckoutSessionId: paymentIntent.metadata?.checkoutSessionId,
-          },
-        ],
+        OR: whereConditions,
       },
     });
 
@@ -161,12 +197,18 @@ export async function handlePaymentIntentFailed(
       return;
     }
 
+    // Prevent voiding already applied payments
+    if (payment.status === 'APPLIED') {
+      console.warn('Cannot void already applied payment:', payment.id);
+      return;
+    }
+
     // Mark payment as VOID
     await prisma.customerPayment.update({
       where: { id: payment.id },
       data: {
         status: 'VOID',
-        gatewayResponse: paymentIntent as any,
+        gatewayResponse: JSON.parse(JSON.stringify(paymentIntent)),
         gatewayTransactionId: paymentIntentId,
       },
     });
