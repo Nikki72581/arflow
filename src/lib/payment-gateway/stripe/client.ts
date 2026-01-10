@@ -12,7 +12,7 @@ export interface StripeCredentials {
  */
 export function initializeStripe(credentials: StripeCredentials): Stripe {
   return new Stripe(credentials.secretKey, {
-    apiVersion: '2024-12-18.acacia',
+    apiVersion: '2025-12-15.clover',
     typescript: true,
   });
 }
@@ -27,7 +27,7 @@ export async function testStripeConnection(
     const stripe = initializeStripe(credentials);
 
     // Retrieve account to verify credentials
-    const account = await stripe.account.retrieve();
+    const account = await stripe.accounts.retrieve();
 
     // Verify we got valid account data
     if (!account || !account.id) {
