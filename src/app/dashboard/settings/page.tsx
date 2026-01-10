@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { updateUserProfile, getUserProfile, updateNotificationPreferences, updateThemePreference } from '@/app/actions/settings'
-import { User, Bell, Shield, Loader2, ShoppingCart, MapPin, ChevronRight, Settings, Palette, Sun, Moon, Monitor } from 'lucide-react'
+import { User, Bell, Shield, Loader2, ChevronRight, Settings, Palette, Sun, Moon, Monitor, Users, FileText, CreditCard, Wallet, Plug } from 'lucide-react'
 import { useTheme } from '@/components/providers/theme-provider'
 import Link from 'next/link'
 
@@ -173,67 +173,128 @@ export default function SettingsPage() {
 
       <Separator className="bg-indigo-500/20" />
 
-      {/* Commission Setup Section */}
+      {/* System Settings Section */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
-            <CardTitle>Commission Setup</CardTitle>
+            <CardTitle>System Settings</CardTitle>
           </div>
           <CardDescription>
-            Configure product categories, territories, and customer tier definitions
+            Configure system-wide settings and preferences
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Project Settings - Admin Only */}
-          {isAdmin && (
-            <div className="space-y-4">
-            </div>
-          )}
-
-          <Separator className="bg-indigo-500/20" />
-
-          <div className="grid gap-4 md:grid-cols-3">
-            {/* Product Categories */}
-            <Link href="/dashboard/settings/product-categories">
-              <Card className="cursor-pointer transition-all hover:shadow-md border-2 hover:border-primary/50">
-                <CardContent className="pt-6">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2 flex-1">
-                      <div className="flex items-center gap-2">
-                        <ShoppingCart className="h-5 w-5 text-blue-600" />
-                        <h3 className="font-semibold">Product Categories</h3>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {/* Team Management */}
+            {isAdmin && (
+              <Link href="/dashboard/team">
+                <Card className="cursor-pointer transition-all hover:shadow-md border-2 hover:border-primary/50">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2 flex-1">
+                        <div className="flex items-center gap-2">
+                          <Users className="h-5 w-5 text-blue-600" />
+                          <h3 className="font-semibold">Team</h3>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Manage team members and their roles
+                        </p>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        Organize products into categories for targeted commission rules
-                      </p>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+                  </CardContent>
+                </Card>
+              </Link>
+            )}
 
-            {/* Territories */}
-            <Link href="/dashboard/settings/territories">
-              <Card className="cursor-pointer transition-all hover:shadow-md border-2 hover:border-primary/50">
-                <CardContent className="pt-6">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2 flex-1">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-5 w-5 text-green-600" />
-                        <h3 className="font-semibold">Territories</h3>
+            {/* Document Types */}
+            {isAdmin && (
+              <Link href="/dashboard/administration/document-types">
+                <Card className="cursor-pointer transition-all hover:shadow-md border-2 hover:border-primary/50">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2 flex-1">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-5 w-5 text-green-600" />
+                          <h3 className="font-semibold">Document Types</h3>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Configure document types and display names
+                        </p>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        Define sales territories and assign clients for regional rules
-                      </p>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+                  </CardContent>
+                </Card>
+              </Link>
+            )}
 
+            {/* Payment Terms */}
+            {isAdmin && (
+              <Link href="/dashboard/administration/payment-terms">
+                <Card className="cursor-pointer transition-all hover:shadow-md border-2 hover:border-primary/50">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2 flex-1">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="h-5 w-5 text-purple-600" />
+                          <h3 className="font-semibold">Payment Terms</h3>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Configure payment terms and due dates
+                        </p>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            )}
+
+            {/* Payment Providers */}
+            {isAdmin && (
+              <Link href="/dashboard/administration/payment-providers">
+                <Card className="cursor-pointer transition-all hover:shadow-md border-2 hover:border-primary/50">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2 flex-1">
+                        <div className="flex items-center gap-2">
+                          <Wallet className="h-5 w-5 text-orange-600" />
+                          <h3 className="font-semibold">Payment Providers</h3>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Configure payment provider integrations
+                        </p>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            )}
+
+            {/* Integrations */}
+            {isAdmin && (
+              <Link href="/dashboard/integrations">
+                <Card className="cursor-pointer transition-all hover:shadow-md border-2 hover:border-primary/50">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2 flex-1">
+                        <div className="flex items-center gap-2">
+                          <Plug className="h-5 w-5 text-indigo-600" />
+                          <h3 className="font-semibold">Integrations</h3>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Manage accounting system integrations
+                        </p>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            )}
           </div>
         </CardContent>
       </Card>

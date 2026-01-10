@@ -3,8 +3,10 @@
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { PaymentMethod } from "@prisma/client";
+import { PaymentMethod, PaymentGatewayProvider } from "@prisma/client";
 import { getDecryptedCredentials } from "./authorize-net";
+import { getDecryptedStripeCredentials } from "./stripe";
+import { processStripePayment } from "@/lib/payment-gateway/stripe/client";
 
 interface PaymentData {
   customerId: string;
@@ -178,13 +180,17 @@ export async function processCreditCardPayment(data: CreditCardPaymentData) {
   }
 
   try {
-    // Get Authorize.net credentials
-    const credentials = await getDecryptedCredentials(user.organizationId);
+    // Get active payment gateway provider
+    const gatewaySettings = await prisma.paymentGatewaySettings.findUnique({
+      where: { organizationId: user.organizationId },
+    });
 
-    if (!credentials) {
+    const activeProvider = gatewaySettings?.activeProvider;
+
+    if (!activeProvider) {
       return {
         success: false,
-        error: "Payment gateway not configured. Please contact support.",
+        error: "No payment gateway configured. Please contact support.",
       };
     }
 
@@ -222,16 +228,64 @@ export async function processCreditCardPayment(data: CreditCardPaymentData) {
       };
     }
 
-    // Process payment through Authorize.net
-    const gatewayResponse = await processAuthorizeNetTransaction({
-      credentials,
-      amount: data.amount,
-      cardNumber: data.cardNumber,
-      expirationDate: data.expirationDate,
-      cvv: data.cvv,
-      billingAddress: data.billingAddress,
-      customerEmail: customer.email || undefined,
-    });
+    // Process payment through the active gateway provider
+    let gatewayResponse: {
+      success: boolean;
+      transactionId?: string;
+      cardType?: string;
+      rawResponse?: any;
+      error?: string;
+    };
+
+    if (activeProvider === "AUTHORIZE_NET") {
+      const credentials = await getDecryptedCredentials(user.organizationId);
+      if (!credentials) {
+        return {
+          success: false,
+          error: "Authorize.net not configured. Please contact support.",
+        };
+      }
+
+      gatewayResponse = await processAuthorizeNetTransaction({
+        credentials,
+        amount: data.amount,
+        cardNumber: data.cardNumber,
+        expirationDate: data.expirationDate,
+        cvv: data.cvv,
+        billingAddress: data.billingAddress,
+        customerEmail: customer.email || undefined,
+      });
+    } else if (activeProvider === "STRIPE") {
+      const credentials = await getDecryptedStripeCredentials(user.organizationId);
+      if (!credentials) {
+        return {
+          success: false,
+          error: "Stripe not configured. Please contact support.",
+        };
+      }
+
+      // Parse expiration date from MMYY format
+      const expirationMonth = data.expirationDate.substring(0, 2);
+      const expirationYear = "20" + data.expirationDate.substring(2, 4);
+
+      gatewayResponse = await processStripePayment(credentials, {
+        amount: data.amount,
+        creditCard: {
+          cardNumber: data.cardNumber,
+          expirationMonth,
+          expirationYear,
+          cvv: data.cvv,
+        },
+        billingAddress: data.billingAddress,
+        customerEmail: customer.email || undefined,
+        description: `Payment from ${customer.companyName}`,
+      });
+    } else {
+      return {
+        success: false,
+        error: "Invalid payment gateway provider",
+      };
+    }
 
     if (!gatewayResponse.success) {
       return {
@@ -263,6 +317,7 @@ export async function processCreditCardPayment(data: CreditCardPaymentData) {
         gatewayResponse: gatewayResponse.rawResponse,
         last4Digits: data.cardNumber.slice(-4),
         cardType: gatewayResponse.cardType,
+        paymentGatewayProvider: activeProvider,
       },
     });
 

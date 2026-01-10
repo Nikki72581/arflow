@@ -24,7 +24,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { createManualPayment, processCreditCardPayment } from "@/app/actions/payments";
-import { getAuthorizeNetSettings } from "@/app/actions/authorize-net";
+import { getActiveProvider } from "@/app/actions/payment-gateway-settings";
 import { formatCurrency } from "@/lib/utils";
 import { PaymentMethod } from "@prisma/client";
 
@@ -63,12 +63,13 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("CHECK");
   const [referenceNumber, setReferenceNumber] = useState("");
 
-  // Check gateway settings when dialog opens
+  // Check active payment gateway when dialog opens
   useEffect(() => {
     if (open) {
-      getAuthorizeNetSettings().then((settings) => {
-        setGatewayEnabled(settings?.enabled || false);
-        if (!settings?.enabled) {
+      getActiveProvider().then((activeProvider) => {
+        const hasActiveProvider = activeProvider !== null;
+        setGatewayEnabled(hasActiveProvider);
+        if (!hasActiveProvider) {
           setPaymentMethod("other");
         }
       });

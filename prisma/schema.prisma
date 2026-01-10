@@ -134,6 +134,11 @@ enum SyncStatus {
   FAILED
 }
 
+enum PaymentGatewayProvider {
+  AUTHORIZE_NET
+  STRIPE
+}
+
 // ============================================
 // CORE MODELS
 // ============================================
@@ -155,6 +160,8 @@ model Organization {
   auditLogs               AuditLog[]
   acumaticaIntegration    AcumaticaIntegration?
   authorizeNetIntegration AuthorizeNetIntegration?
+  stripeIntegration       StripeIntegration?
+  paymentGatewaySettings  PaymentGatewaySettings?
   documentTypeSettings    DocumentTypeSetting[]
   paymentTermTypes        PaymentTermType[]
 
@@ -433,11 +440,12 @@ model CustomerPayment {
   status         PaymentStatus @default(APPLIED)
   notes          String?
 
-  // Payment Gateway Integration (Authorize.net, etc.)
-  gatewayTransactionId String? // Transaction ID from payment gateway
-  gatewayResponse      Json? // Full gateway response for debugging
-  last4Digits          String? // Last 4 digits of card (for display)
-  cardType             String? // Visa, Mastercard, Amex, etc.
+  // Payment Gateway Integration (Authorize.net, Stripe, etc.)
+  gatewayTransactionId   String? // Transaction ID from payment gateway
+  gatewayResponse        Json? // Full gateway response for debugging
+  last4Digits            String? // Last 4 digits of card (for display)
+  cardType               String? // Visa, Mastercard, Amex, etc.
+  paymentGatewayProvider PaymentGatewayProvider? // Which gateway processed this payment
 
   // Integration tracking
   sourceType     RecordSourceType @default(MANUAL)
@@ -672,4 +680,54 @@ model AuthorizeNetIntegration {
 
   @@index([organizationId])
   @@map("authorize_net_integrations")
+}
+
+model StripeIntegration {
+  id             String @id @default(cuid())
+  organizationId String @unique
+
+  // API Credentials (encrypted)
+  encryptedSecretKey      String // Encrypted Secret Key (sk_test_... or sk_live_...)
+  encryptedPublishableKey String // Encrypted Publishable Key (pk_test_... or pk_live_...)
+  encryptedWebhookSecret  String? // Optional: Encrypted webhook signing secret
+
+  // Environment
+  isProduction Boolean @default(false) // false = test mode, true = live mode
+
+  // Settings
+  enabled                Boolean   @default(false)
+  lastConnectionTest     DateTime?
+  connectionErrorMessage String?
+
+  // Features
+  enableCustomerPayments Boolean @default(true) // Allow customer portal payments
+  enablePaymentLinks     Boolean @default(false) // Future: Payment Links
+  enableSavedCards       Boolean @default(false) // Future: Save cards for future use
+
+  // Transaction Settings
+  requireCVV            Boolean @default(true)
+  requireBillingAddress Boolean @default(true)
+  captureMethod         String  @default("automatic") // "automatic" or "manual"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("stripe_integrations")
+}
+
+model PaymentGatewaySettings {
+  id             String                   @id @default(cuid())
+  organizationId String                   @unique
+  activeProvider PaymentGatewayProvider? // null = no active provider
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("payment_gateway_settings")
 }
