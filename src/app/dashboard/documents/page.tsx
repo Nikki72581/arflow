@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { getEnabledDocumentTypes } from "@/app/actions/document-type-settings";
 import { DocumentsPageContent } from "@/components/documents/documents-page-content";
+import { DocumentFormDialog } from "@/components/documents/document-form-dialog";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -25,6 +26,7 @@ export default async function DocumentsPage({
             View and manage all your documents
           </p>
         </div>
+        <DocumentFormDialog />
       </div>
 
       <Suspense fallback={<DocumentsLoadingSkeleton />}>

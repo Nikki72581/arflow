@@ -173,47 +173,56 @@ export async function createDocument(data: {
   notes?: string;
   customerNotes?: string;
 }) {
-  const { userId } = await auth();
-  if (!userId) {
-    throw new Error("Unauthorized");
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { clerkId: userId },
+    });
+
+    if (!user || user.role !== "ADMIN") {
+      return { success: false, error: "Only admins can create documents" };
+    }
+
+    const document = await prisma.arDocument.create({
+      data: {
+        organizationId: user.organizationId,
+        customerId: data.customerId,
+        documentType: data.documentType,
+        documentNumber: data.documentNumber,
+        referenceNumber: data.referenceNumber,
+        documentDate: data.documentDate,
+        dueDate: data.dueDate,
+        subtotal: data.subtotal,
+        taxAmount: data.taxAmount || 0,
+        totalAmount: data.totalAmount,
+        balanceDue: data.totalAmount,
+        description: data.description,
+        notes: data.notes,
+        customerNotes: data.customerNotes,
+        sourceType: "MANUAL",
+        status: "OPEN",
+      },
+      include: {
+        customer: true,
+      },
+    });
+
+    revalidatePath("/dashboard/documents");
+    revalidatePath(`/dashboard/clients/${data.customerId}`);
+
+    return {
+      success: true,
+      data: document,
+      message: "Document created successfully",
+    };
+  } catch (error: any) {
+    console.error("Error creating document:", error);
+    return { success: false, error: error.message || "Failed to create document" };
   }
-
-  const user = await prisma.user.findUnique({
-    where: { clerkId: userId },
-  });
-
-  if (!user || user.role !== "ADMIN") {
-    throw new Error("Unauthorized");
-  }
-
-  const document = await prisma.arDocument.create({
-    data: {
-      organizationId: user.organizationId,
-      customerId: data.customerId,
-      documentType: data.documentType,
-      documentNumber: data.documentNumber,
-      referenceNumber: data.referenceNumber,
-      documentDate: data.documentDate,
-      dueDate: data.dueDate,
-      subtotal: data.subtotal,
-      taxAmount: data.taxAmount || 0,
-      totalAmount: data.totalAmount,
-      balanceDue: data.totalAmount,
-      description: data.description,
-      notes: data.notes,
-      customerNotes: data.customerNotes,
-      sourceType: "MANUAL",
-      status: "OPEN",
-    },
-    include: {
-      customer: true,
-    },
-  });
-
-  revalidatePath("/dashboard/documents");
-  revalidatePath(`/dashboard/clients/${data.customerId}`);
-
-  return document;
 }
 
 export async function updateDocument(
