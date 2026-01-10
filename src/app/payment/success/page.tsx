@@ -70,7 +70,7 @@ async function PaymentSuccessContent({ sessionId }: { sessionId: string }) {
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
           <h1 className="text-3xl font-bold">Payment Successful!</h1>
           <p className="text-muted-foreground mt-2">
-            Your payment of {formatCurrency(result.amount)} has been processed successfully.
+            Your payment of {formatCurrency(result.amount!)} has been processed successfully.
           </p>
         </div>
 
@@ -87,7 +87,7 @@ async function PaymentSuccessContent({ sessionId }: { sessionId: string }) {
               </div>
               <div>
                 <p className="text-muted-foreground">Amount</p>
-                <p className="font-semibold">{formatCurrency(result.amount)}</p>
+                <p className="font-semibold">{formatCurrency(result.amount!)}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">Customer</p>
@@ -108,7 +108,7 @@ async function PaymentSuccessContent({ sessionId }: { sessionId: string }) {
                   {result.documents.length === 1 ? "document" : "documents"}:
                 </p>
                 <div className="space-y-2">
-                  {result.documents.map((doc) => (
+                  {result.documents?.map((doc: any) => (
                     <div
                       key={doc.id}
                       className="flex justify-between text-sm p-2 bg-muted rounded"
