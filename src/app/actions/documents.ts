@@ -187,6 +187,52 @@ export async function createDocument(data: {
       return { success: false, error: "Only admins can create documents" };
     }
 
+    // Fetch customer with payment term to auto-calculate due date and discounts
+    const customer = await prisma.customer.findUnique({
+      where: { id: data.customerId },
+      include: { paymentTerm: true },
+    });
+
+    if (!customer) {
+      return { success: false, error: "Customer not found" };
+    }
+
+    // Calculate due date and discount info from payment term
+    let calculatedDueDate = data.dueDate;
+    let earlyPaymentDeadline: Date | undefined;
+    let discountPercentage: number | undefined;
+    let discountAvailable: number | undefined;
+    let paymentTermSnapshot: any = null;
+
+    if (customer.paymentTerm && !data.dueDate) {
+      const term = customer.paymentTerm;
+
+      // Calculate due date
+      calculatedDueDate = new Date(data.documentDate);
+      calculatedDueDate.setDate(calculatedDueDate.getDate() + term.daysDue);
+
+      // Calculate discount info if applicable
+      if (term.hasDiscount && term.discountDays && term.discountPercentage) {
+        earlyPaymentDeadline = new Date(data.documentDate);
+        earlyPaymentDeadline.setDate(
+          earlyPaymentDeadline.getDate() + term.discountDays
+        );
+        discountPercentage = term.discountPercentage;
+        discountAvailable = (data.totalAmount * term.discountPercentage) / 100;
+      }
+
+      // Store payment term snapshot for audit trail
+      paymentTermSnapshot = {
+        id: term.id,
+        name: term.name,
+        code: term.code,
+        daysDue: term.daysDue,
+        hasDiscount: term.hasDiscount,
+        discountDays: term.discountDays,
+        discountPercentage: term.discountPercentage,
+      };
+    }
+
     const document = await prisma.arDocument.create({
       data: {
         organizationId: user.organizationId,
@@ -195,7 +241,7 @@ export async function createDocument(data: {
         documentNumber: data.documentNumber,
         referenceNumber: data.referenceNumber,
         documentDate: data.documentDate,
-        dueDate: data.dueDate,
+        dueDate: calculatedDueDate,
         subtotal: data.subtotal,
         taxAmount: data.taxAmount || 0,
         totalAmount: data.totalAmount,
@@ -205,6 +251,14 @@ export async function createDocument(data: {
         customerNotes: data.customerNotes,
         sourceType: "MANUAL",
         status: "OPEN",
+        // Payment term tracking
+        paymentTermId: customer.paymentTermId,
+        appliedPaymentTerm: paymentTermSnapshot,
+        earlyPaymentDeadline,
+        discountPercentage,
+        discountAvailable,
+        discountTaken: 0,
+        hasPaymentSchedule: false,
       },
       include: {
         customer: true,

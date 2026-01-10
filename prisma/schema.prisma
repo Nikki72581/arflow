@@ -155,6 +155,7 @@ model Organization {
   auditLogs            AuditLog[]
   acumaticaIntegration AcumaticaIntegration?
   documentTypeSettings DocumentTypeSetting[]
+  paymentTermTypes     PaymentTermType[]
 
   @@map("organizations")
 }
@@ -227,7 +228,8 @@ model Customer {
   creditLimit     Float?         @default(0)
   currentBalance  Float          @default(0) // Calculated field, updated on document/payment changes
   status          CustomerStatus @default(ACTIVE)
-  paymentTerms    String? // e.g., "Net 30", "Net 60"
+  paymentTerms    String? @map("payment_terms_legacy") // Deprecated: legacy payment terms text
+  paymentTermId   String? // Foreign key to PaymentTermType
   notes           String?
 
   // Portal Access
@@ -244,7 +246,8 @@ model Customer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  paymentTerm  PaymentTermType? @relation(fields: [paymentTermId], references: [id], onDelete: SetNull)
   arDocuments  ArDocument[]
   payments     CustomerPayment[]
   portalUsers  User[] // Portal users linked to this customer
@@ -253,6 +256,7 @@ model Customer {
   @@index([organizationId])
   @@index([status])
   @@index([customerNumber])
+  @@index([paymentTermId])
   @@map("customers")
 }
 
@@ -288,6 +292,17 @@ model ArDocument {
   notes         String? // Internal notes
   customerNotes String? // Notes visible to customer on portal
 
+  // Payment Term Tracking
+  paymentTermId        String? // Reference to payment term at creation
+  appliedPaymentTerm   Json? // Snapshot: {name, daysDue, discountDays, discountPercentage}
+  earlyPaymentDeadline DateTime? // Date by which discount applies
+  discountPercentage   Float? // Discount percentage if paid early
+  discountAvailable    Float? // Dollar amount of discount available
+  discountTaken        Float    @default(0) // Discount actually applied
+
+  // Payment Schedule
+  hasPaymentSchedule Boolean @default(false)
+
   // Integration Source Tracking
   sourceType     RecordSourceType @default(MANUAL)
   externalSystem String? // "ACUMATICA" or null
@@ -308,9 +323,10 @@ model ArDocument {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  customer            Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  organization        Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer            Customer                     @relation(fields: [customerId], references: [id], onDelete: Cascade)
   paymentApplications PaymentApplication[]
+  paymentSchedule     PaymentScheduleInstallment[]
 
   @@unique([organizationId, externalId, externalSystem])
   @@index([organizationId])
@@ -338,6 +354,66 @@ model DocumentTypeSetting {
   @@index([organizationId])
   @@index([enabled])
   @@map("document_type_settings")
+}
+
+model PaymentTermType {
+  id             String   @id @default(cuid())
+  organizationId String
+
+  // Display information
+  name        String // e.g., "2% 10 Net 30", "Net 15", "Net 30"
+  description String? // Optional detailed explanation
+  code        String // Short code: "2_10_NET_30", "NET_15"
+
+  // Term configuration
+  daysDue Int // Number of days until due (e.g., 30)
+
+  // Early payment discount (optional)
+  hasDiscount        Boolean @default(false)
+  discountDays       Int? // Days within which discount applies (e.g., 10)
+  discountPercentage Float? // Discount percentage (e.g., 2.0 for 2%)
+
+  // Settings
+  enabled      Boolean @default(true)
+  displayOrder Int     @default(0)
+  isDefault    Boolean @default(false) // One default per organization
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customers    Customer[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@index([enabled])
+  @@map("payment_term_types")
+}
+
+model PaymentScheduleInstallment {
+  id           String   @id @default(cuid())
+  arDocumentId String
+
+  // Installment details
+  installmentNumber Int // 1, 2, 3, etc.
+  dueDate           DateTime
+  amount            Float
+  description       String? // e.g., "First installment", "Final payment"
+
+  // Payment tracking
+  status     DocumentStatus @default(OPEN) // OPEN, PARTIAL, PAID, VOID
+  amountPaid Float          @default(0)
+  balanceDue Float // amount - amountPaid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  arDocument ArDocument @relation(fields: [arDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([arDocumentId])
+  @@index([dueDate])
+  @@index([status])
+  @@map("payment_schedule_installments")
 }
 
 // ============================================

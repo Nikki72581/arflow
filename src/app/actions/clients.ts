@@ -12,7 +12,8 @@ interface CreateClientInput {
   website?: string
   customerNumber?: string
   creditLimit?: number
-  paymentTerms?: string
+  paymentTermId?: string
+  paymentTerms?: string // Deprecated - kept for backward compatibility
   notes?: string
   billingAddress1?: string
   billingAddress2?: string
@@ -168,6 +169,7 @@ export async function getClients() {
         organizationId: user.organizationId,
       },
       include: {
+        paymentTerm: true,
         _count: {
           select: {
             arDocuments: true,

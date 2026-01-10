@@ -50,6 +50,7 @@ export function DocumentsTable({
   const pageSize = Number(params.get("pageSize")) || 25;
   const status = params.get("status") as DocumentStatus | undefined;
   const search = params.get("search") || "";
+  const refreshKey = params.get("_refresh") || "";
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -73,7 +74,7 @@ export function DocumentsTable({
     };
 
     fetchDocuments();
-  }, [currentPage, pageSize, documentType, status, search]);
+  }, [currentPage, pageSize, documentType, status, search, refreshKey]);
 
   const updateSearchParam = (key: string, value: string | null) => {
     const newParams = new URLSearchParams(params.toString());

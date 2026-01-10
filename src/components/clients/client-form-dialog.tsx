@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -30,6 +30,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion'
 import { createClient, updateClient } from '@/app/actions/clients'
+import { getEnabledPaymentTermTypes } from '@/app/actions/payment-term-types'
 import type { Customer } from '@/lib/types'
 
 interface ClientFormDialogProps {
@@ -51,8 +52,17 @@ export function ClientFormDialog({
   const [status, setStatus] = useState<'ACTIVE' | 'INACTIVE' | 'ON_HOLD' | 'COLLECTIONS'>(
     client?.status || 'ACTIVE'
   )
+  const [paymentTermId, setPaymentTermId] = useState<string>(client?.paymentTermId || '')
+  const [paymentTerms, setPaymentTerms] = useState<any[]>([])
 
   const isEdit = !!client
+
+  // Load payment terms when dialog opens
+  useEffect(() => {
+    if (open) {
+      getEnabledPaymentTermTypes().then(setPaymentTerms)
+    }
+  }, [open])
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -75,7 +85,7 @@ export function ClientFormDialog({
       phone: getString('phone'),
       website: getString('website'),
       customerNumber: getString('customerNumber'),
-      paymentTerms: getString('paymentTerms'),
+      paymentTermId: paymentTermId || undefined,
       creditLimit: Number.isFinite(creditLimit) ? creditLimit : undefined,
       billingAddress1: getString('billingAddress1'),
       billingCity: getString('billingCity'),
@@ -281,13 +291,30 @@ export function ClientFormDialog({
               </h3>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2">
-                  <Label htmlFor="paymentTerms">Payment terms</Label>
-                  <Input
-                    id="paymentTerms"
-                    name="paymentTerms"
-                    defaultValue={client?.paymentTerms || ''}
-                    placeholder="Net 30"
-                  />
+                  <Label htmlFor="paymentTermId">Payment terms</Label>
+                  <Select value={paymentTermId} onValueChange={setPaymentTermId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select payment terms" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">No payment terms</SelectItem>
+                      {paymentTerms.map((term) => (
+                        <SelectItem key={term.id} value={term.id}>
+                          {term.name}
+                          {term.hasDiscount && (
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              ({term.discountPercentage}% early discount)
+                            </span>
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {paymentTerms.find(t => t.id === paymentTermId)?.description && (
+                    <p className="text-xs text-muted-foreground">
+                      {paymentTerms.find(t => t.id === paymentTermId)?.description}
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid gap-2">

@@ -18,6 +18,7 @@ import {
   Plug,
   ChevronLeft,
   Menu,
+  Calendar,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -97,6 +98,13 @@ const navigation: NavItem[] = [
         title: 'Document Types',
         href: '/dashboard/administration/document-types',
         icon: FileText,
+        iconColor: 'text-indigo-600 dark:text-indigo-400',
+        adminOnly: true,
+      },
+      {
+        title: 'Payment Terms',
+        href: '/dashboard/administration/payment-terms',
+        icon: Calendar,
         iconColor: 'text-indigo-600 dark:text-indigo-400',
         adminOnly: true,
       },

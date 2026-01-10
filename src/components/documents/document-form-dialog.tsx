@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -43,6 +43,7 @@ export function DocumentFormDialog({
   defaultOpen = false,
 }: DocumentFormDialogProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [open, setOpen] = useState(defaultOpen)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -51,7 +52,11 @@ export function DocumentFormDialog({
   const [customerId, setCustomerId] = useState<string>('')
   const [documentDate, setDocumentDate] = useState<string>(new Date().toISOString().split('T')[0])
   const [dueDate, setDueDate] = useState<string>('')
+  const [dueDateManuallySet, setDueDateManuallySet] = useState(false)
   const [clients, setClients] = useState<any[]>([])
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
+  const [paymentTermInfo, setPaymentTermInfo] = useState<any>(null)
+  const formRef = useRef<HTMLFormElement>(null)
 
   // Load clients when dialog opens
   useEffect(() => {
@@ -63,6 +68,62 @@ export function DocumentFormDialog({
       })
     }
   }, [open])
+
+  // Calculate due date when customer or document date changes
+  useEffect(() => {
+    if (customerId && documentDate) {
+      const customer = clients.find(c => c.id === customerId)
+      setSelectedCustomer(customer)
+
+      if (customer?.paymentTerm) {
+        const term = customer.paymentTerm
+
+        // Calculate projected due date
+        const docDate = new Date(documentDate)
+        const projectedDueDate = new Date(docDate)
+        projectedDueDate.setDate(projectedDueDate.getDate() + term.daysDue)
+
+        setPaymentTermInfo({
+          term: term,
+          projectedDueDate: projectedDueDate.toISOString().split('T')[0]
+        })
+
+        // Auto-set due date if not manually set
+        if (!dueDateManuallySet) {
+          setDueDate(projectedDueDate.toISOString().split('T')[0])
+        }
+      } else {
+        setPaymentTermInfo(null)
+      }
+    } else {
+      setPaymentTermInfo(null)
+      setSelectedCustomer(null)
+    }
+  }, [customerId, documentDate, clients, dueDateManuallySet])
+
+  // Reset form when dialog closes
+  const handleDialogChange = (isOpen: boolean) => {
+    setOpen(isOpen)
+    if (!isOpen) {
+      // Reset form state
+      formRef.current?.reset()
+      setDocumentType('INVOICE')
+      setCustomerId('')
+      setDocumentDate(new Date().toISOString().split('T')[0])
+      setDueDate('')
+      setDueDateManuallySet(false)
+      setSelectedCustomer(null)
+      setPaymentTermInfo(null)
+      setError(null)
+      setShowSuccess(false)
+    }
+  }
+
+  // Handle due date changes to track manual edits
+  const handleDueDateChange = (newDueDate: string) => {
+    setDueDate(newDueDate)
+    setDueDateManuallySet(true)
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -114,6 +175,10 @@ export function DocumentFormDialog({
         setTimeout(() => {
           setShowSuccess(false)
           setOpen(false)
+          // Preserve existing URL params and add refresh timestamp to trigger re-fetch
+          const currentParams = new URLSearchParams(searchParams.toString())
+          currentParams.set('_refresh', Date.now().toString())
+          router.push(`/dashboard/documents?${currentParams.toString()}`)
           router.refresh()
         }, 1500)
       } else {
@@ -127,7 +192,7 @@ export function DocumentFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleDialogChange}>
       {trigger ? (
         <DialogTrigger asChild>{trigger}</DialogTrigger>
       ) : (
@@ -152,7 +217,7 @@ export function DocumentFormDialog({
             </p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit}>
+          <form ref={formRef} onSubmit={handleSubmit}>
             <DialogHeader>
               <DialogTitle>Create New Document</DialogTitle>
               <DialogDescription>
@@ -258,10 +323,32 @@ export function DocumentFormDialog({
                       id="dueDate"
                       type="date"
                       value={dueDate}
-                      onChange={(e) => setDueDate(e.target.value)}
+                      onChange={(e) => handleDueDateChange(e.target.value)}
                     />
                   </div>
                 </div>
+
+                {/* Payment Term Information */}
+                {paymentTermInfo && (
+                  <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md p-3 mt-4">
+                    <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                      Payment Terms: {paymentTermInfo.term.name}
+                    </p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                      Due date calculated as {paymentTermInfo.term.daysDue} days from document date
+                    </p>
+                    {paymentTermInfo.term.hasDiscount && (
+                      <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                        💰 {paymentTermInfo.term.discountPercentage}% early payment discount available if paid within {paymentTermInfo.term.discountDays} days
+                      </p>
+                    )}
+                    {dueDateManuallySet && (
+                      <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                        ⚠️ Due date has been manually adjusted
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Financial Information Section */}
