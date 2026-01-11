@@ -182,3 +182,82 @@ input[type="number"] {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;  /* Chrome, Safari, Opera */
 }
+
+/* Print-specific styles for invoice printing */
+@media print {
+  @page {
+    margin: 0.5in;
+    size: letter;
+  }
+
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Hide non-printable elements */
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Ensure printed invoice fills page */
+  .printed-invoice-view {
+    page-break-inside: avoid;
+  }
+
+  /* Force borders to print */
+  .print\:border-gray-300 {
+    border-color: #d1d5db !important;
+  }
+
+  .print\:border-gray-400 {
+    border-color: #9ca3af !important;
+  }
+
+  .print\:text-black {
+    color: #000 !important;
+  }
+
+  .print\:text-gray-600 {
+    color: #4b5563 !important;
+  }
+
+  .print\:text-gray-700 {
+    color: #374151 !important;
+  }
+
+  .print\:text-green-700 {
+    color: #15803d !important;
+  }
+
+  .print\:text-orange-700 {
+    color: #c2410c !important;
+  }
+
+  .print\:bg-gray-50 {
+    background-color: #f9fafb !important;
+  }
+
+  .print\:bg-green-50 {
+    background-color: #f0fdf4 !important;
+  }
+
+  /* Table styling for print */
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  /* Print footer styles */
+  .print\:block {
+    display: block !important;
+  }
+}

@@ -8,6 +8,7 @@ const isPublicRoute = createRouteMatcher([
   '/sign-up(.*)',
   '/api/webhooks(.*)',
   '/payment(.*)', // Allow payment success/cancel pages for Stripe redirects
+  '/invoice/(.*)', // Allow public invoice sharing
 ]);
 
 const isOnboardingRoute = createRouteMatcher(['/onboarding']);

@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { DocumentType, DocumentStatus } from "@prisma/client";
+import { LineItemFormData } from "@/lib/types";
 
 export async function getDocuments({
   page = 1,
@@ -115,6 +116,12 @@ export async function getDocument(id: string) {
     },
     include: {
       customer: true,
+      organization: true,
+      lineItems: {
+        orderBy: {
+          lineNumber: 'asc',
+        },
+      },
       paymentApplications: {
         include: {
           payment: true,
@@ -166,10 +173,7 @@ export async function createDocument(data: {
   referenceNumber?: string;
   documentDate: Date;
   dueDate?: Date;
-  subtotal: number;
-  taxAmount?: number;
-  totalAmount: number;
-  description?: string;
+  lineItems: LineItemFormData[];
   notes?: string;
   customerNotes?: string;
   paymentTermId?: string;
@@ -188,6 +192,11 @@ export async function createDocument(data: {
       return { success: false, error: "Only admins can create documents" };
     }
 
+    // Validate line items
+    if (!data.lineItems || data.lineItems.length === 0) {
+      return { success: false, error: "At least one line item is required" };
+    }
+
     // Fetch customer to validate
     const customer = await prisma.customer.findUnique({
       where: { id: data.customerId },
@@ -196,6 +205,35 @@ export async function createDocument(data: {
     if (!customer) {
       return { success: false, error: "Customer not found" };
     }
+
+    // Calculate line item amounts
+    const calculatedLineItems = data.lineItems.map((item, index) => {
+      const lineSubtotal = item.quantity * item.unitPrice;
+      const discountAmount = lineSubtotal * (item.discountPercent / 100);
+      const taxableAmount = lineSubtotal - discountAmount;
+      const taxAmount = taxableAmount * (item.taxPercent / 100);
+      const lineTotal = taxableAmount + taxAmount;
+
+      return {
+        lineNumber: index + 1,
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        discountPercent: item.discountPercent,
+        taxPercent: item.taxPercent,
+        lineSubtotal,
+        discountAmount,
+        taxableAmount,
+        taxAmount,
+        lineTotal,
+      };
+    });
+
+    // Calculate document totals from line items
+    const subtotal = calculatedLineItems.reduce((sum, item) => sum + item.lineSubtotal, 0);
+    const totalDiscount = calculatedLineItems.reduce((sum, item) => sum + item.discountAmount, 0);
+    const taxAmount = calculatedLineItems.reduce((sum, item) => sum + item.taxAmount, 0);
+    const totalAmount = calculatedLineItems.reduce((sum, item) => sum + item.lineTotal, 0);
 
     // Determine which payment term to use
     let paymentTermToUse = null;
@@ -237,7 +275,7 @@ export async function createDocument(data: {
           earlyPaymentDeadline.getDate() + term.discountDays
         );
         discountPercentage = term.discountPercentage;
-        discountAvailable = (data.totalAmount * term.discountPercentage) / 100;
+        discountAvailable = (totalAmount * term.discountPercentage) / 100;
       }
 
       // Store payment term snapshot for audit trail
@@ -252,36 +290,48 @@ export async function createDocument(data: {
       };
     }
 
-    const document = await prisma.arDocument.create({
-      data: {
-        organizationId: user.organizationId,
-        customerId: data.customerId,
-        documentType: data.documentType,
-        documentNumber: data.documentNumber,
-        referenceNumber: data.referenceNumber,
-        documentDate: data.documentDate,
-        dueDate: calculatedDueDate,
-        subtotal: data.subtotal,
-        taxAmount: data.taxAmount || 0,
-        totalAmount: data.totalAmount,
-        balanceDue: data.totalAmount,
-        description: data.description,
-        notes: data.notes,
-        customerNotes: data.customerNotes,
-        sourceType: "MANUAL",
-        status: "OPEN",
-        // Payment term tracking
-        paymentTermId: paymentTermIdToStore,
-        appliedPaymentTerm: paymentTermSnapshot,
-        earlyPaymentDeadline,
-        discountPercentage,
-        discountAvailable,
-        discountTaken: 0,
-        hasPaymentSchedule: false,
-      },
-      include: {
-        customer: true,
-      },
+    // Create document with line items in a transaction
+    const document = await prisma.$transaction(async (tx) => {
+      const doc = await tx.arDocument.create({
+        data: {
+          organizationId: user.organizationId,
+          customerId: data.customerId,
+          documentType: data.documentType,
+          documentNumber: data.documentNumber,
+          referenceNumber: data.referenceNumber,
+          documentDate: data.documentDate,
+          dueDate: calculatedDueDate,
+          subtotal,
+          taxAmount,
+          totalAmount,
+          balanceDue: totalAmount,
+          notes: data.notes,
+          customerNotes: data.customerNotes,
+          sourceType: "MANUAL",
+          status: "OPEN",
+          // Payment term tracking
+          paymentTermId: paymentTermIdToStore,
+          appliedPaymentTerm: paymentTermSnapshot,
+          earlyPaymentDeadline,
+          discountPercentage,
+          discountAvailable,
+          discountTaken: 0,
+          hasPaymentSchedule: false,
+          // Create line items
+          lineItems: {
+            create: calculatedLineItems,
+          },
+        },
+        include: {
+          customer: true,
+          lineItems: {
+            orderBy: {
+              lineNumber: 'asc',
+            },
+          },
+        },
+      });
+      return doc;
     });
 
     revalidatePath("/dashboard/documents");

@@ -33,6 +33,8 @@ import { createDocument } from '@/app/actions/documents'
 import { getClients } from '@/app/actions/clients'
 import { getEnabledPaymentTermTypes } from '@/app/actions/payment-term-types'
 import { DocumentType } from '@prisma/client'
+import { LineItemsForm } from './line-items-form'
+import { LineItemFormData, CalculatedTotals } from '@/lib/types'
 
 interface DocumentFormDialogProps {
   trigger?: React.ReactNode
@@ -59,6 +61,13 @@ export function DocumentFormDialog({
   const [paymentTermInfo, setPaymentTermInfo] = useState<any>(null)
   const [paymentTerms, setPaymentTerms] = useState<any[]>([])
   const [selectedPaymentTermId, setSelectedPaymentTermId] = useState<string>('')
+  const [lineItems, setLineItems] = useState<LineItemFormData[]>([])
+  const [calculatedTotals, setCalculatedTotals] = useState<CalculatedTotals>({
+    subtotal: 0,
+    totalDiscount: 0,
+    totalTax: 0,
+    grandTotal: 0,
+  })
   const formRef = useRef<HTMLFormElement>(null)
 
   // Load clients and payment terms when dialog opens
@@ -133,6 +142,13 @@ export function DocumentFormDialog({
       setSelectedCustomer(null)
       setPaymentTermInfo(null)
       setSelectedPaymentTermId('')
+      setLineItems([])
+      setCalculatedTotals({
+        subtotal: 0,
+        totalDiscount: 0,
+        totalTax: 0,
+        grandTotal: 0,
+      })
       setError(null)
       setShowSuccess(false)
     }
@@ -149,6 +165,21 @@ export function DocumentFormDialog({
     setLoading(true)
     setError(null)
 
+    // Validate line items
+    if (lineItems.length === 0) {
+      setError('At least one line item is required')
+      setLoading(false)
+      return
+    }
+
+    // Validate that all line items have descriptions
+    const hasEmptyDescriptions = lineItems.some(item => !item.description.trim())
+    if (hasEmptyDescriptions) {
+      setError('All line items must have a description')
+      setLoading(false)
+      return
+    }
+
     const formData = new FormData(e.currentTarget)
     const getString = (key: string) => {
       const value = formData.get(key)
@@ -157,17 +188,6 @@ export function DocumentFormDialog({
       return trimmed.length > 0 ? trimmed : undefined
     }
 
-    const getNumber = (key: string) => {
-      const value = getString(key)
-      if (!value) return undefined
-      const num = Number(value)
-      return Number.isFinite(num) ? num : undefined
-    }
-
-    const subtotal = getNumber('subtotal') || 0
-    const taxAmount = getNumber('taxAmount') || 0
-    const totalAmount = subtotal + taxAmount
-
     const data = {
       customerId,
       documentType,
@@ -175,10 +195,7 @@ export function DocumentFormDialog({
       referenceNumber: getString('referenceNumber'),
       documentDate: new Date(documentDate),
       dueDate: dueDate ? new Date(dueDate) : undefined,
-      subtotal,
-      taxAmount,
-      totalAmount,
-      description: getString('description'),
+      lineItems,
       notes: getString('notes'),
       customerNotes: getString('customerNotes'),
       paymentTermId: selectedPaymentTermId || undefined,
@@ -393,77 +410,27 @@ export function DocumentFormDialog({
                 )}
               </div>
 
-              {/* Financial Information Section */}
+              {/* Line Items Section */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                  Financial Details
+                  Line Items <span className="text-destructive">*</span>
                 </h3>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="grid gap-2">
-                    <Label htmlFor="subtotal">
-                      Subtotal <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="subtotal"
-                      name="subtotal"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      defaultValue="0.00"
-                      placeholder="0.00"
-                      required
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="taxAmount">Tax amount</Label>
-                    <Input
-                      id="taxAmount"
-                      name="taxAmount"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      defaultValue="0.00"
-                      placeholder="0.00"
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="totalAmount">Total amount</Label>
-                    <Input
-                      id="totalAmount"
-                      name="totalAmount"
-                      type="number"
-                      disabled
-                      value={
-                        (Number(document.getElementById('subtotal')?.getAttribute('value') || 0) +
-                        Number(document.getElementById('taxAmount')?.getAttribute('value') || 0)).toFixed(2)
-                      }
-                      placeholder="0.00"
-                      className="bg-muted"
-                    />
-                  </div>
-                </div>
+                <LineItemsForm
+                  onChange={(items, totals) => {
+                    setLineItems(items)
+                    setCalculatedTotals(totals)
+                  }}
+                />
               </div>
 
-              {/* Description and Notes - Collapsed */}
+              {/* Notes - Collapsed */}
               <Accordion type="multiple" className="w-full">
-                <AccordionItem value="description">
+                <AccordionItem value="notes">
                   <AccordionTrigger className="text-sm font-semibold hover:no-underline">
-                    Description & Notes
+                    Notes
                   </AccordionTrigger>
                   <AccordionContent>
                     <div className="grid gap-4 pt-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="description">Description</Label>
-                        <Textarea
-                          id="description"
-                          name="description"
-                          placeholder="Line item description or summary..."
-                          rows={3}
-                        />
-                      </div>
-
                       <div className="grid gap-2">
                         <Label htmlFor="notes">Internal notes</Label>
                         <Textarea
@@ -479,7 +446,7 @@ export function DocumentFormDialog({
                         <Textarea
                           id="customerNotes"
                           name="customerNotes"
-                          placeholder="Notes visible to customer on portal..."
+                          placeholder="Notes visible to customer on invoice and portal..."
                           rows={3}
                         />
                       </div>

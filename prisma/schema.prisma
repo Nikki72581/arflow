@@ -152,6 +152,17 @@ model Organization {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  // Branding for invoices
+  logoUrl String?
+  address1 String?
+  address2 String?
+  city     String?
+  state    String?
+  zipCode  String?
+  phone    String?
+  email    String?
+  website  String?
+
   users                   User[]
   customers               Customer[]
   arDocuments             ArDocument[]
@@ -311,6 +322,11 @@ model ArDocument {
   // Payment Schedule
   hasPaymentSchedule Boolean @default(false)
 
+  // Public Sharing
+  publicShareToken     String?   @unique
+  publicShareEnabled   Boolean   @default(false)
+  publicShareCreatedAt DateTime?
+
   // Integration Source Tracking
   sourceType     RecordSourceType @default(MANUAL)
   externalSystem String? // "ACUMATICA" or null
@@ -335,6 +351,7 @@ model ArDocument {
   customer            Customer                     @relation(fields: [customerId], references: [id], onDelete: Cascade)
   paymentApplications PaymentApplication[]
   paymentSchedule     PaymentScheduleInstallment[]
+  lineItems           ArDocumentLineItem[]
 
   @@unique([organizationId, externalId, externalSystem])
   @@index([organizationId])
@@ -344,6 +361,34 @@ model ArDocument {
   @@index([documentDate])
   @@index([dueDate])
   @@map("ar_documents")
+}
+
+model ArDocumentLineItem {
+  id           String @id @default(cuid())
+  arDocumentId String
+
+  // Line item details
+  lineNumber      Int
+  description     String
+  quantity        Float  @default(1)
+  unitPrice       Float
+  discountPercent Float  @default(0)
+  taxPercent      Float  @default(0)
+
+  // Calculated amounts (stored for performance)
+  lineSubtotal   Float
+  discountAmount Float
+  taxableAmount  Float
+  taxAmount      Float
+  lineTotal      Float
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  arDocument ArDocument @relation(fields: [arDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([arDocumentId])
+  @@map("ar_document_line_items")
 }
 
 model DocumentTypeSetting {
