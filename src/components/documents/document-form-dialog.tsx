@@ -246,7 +246,7 @@ export function DocumentFormDialog({
           </Button>
         </DialogTrigger>
       )}
-      <DialogContent className="sm:max-w-[760px]" data-testid="document-form-dialog">
+      <DialogContent className="sm:max-w-[1100px]" data-testid="document-form-dialog">
         {showSuccess ? (
           <div className="flex flex-col items-center justify-center py-12" data-testid="success-message">
             <div className="animate-in zoom-in duration-500">
