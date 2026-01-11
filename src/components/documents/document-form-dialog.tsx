@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -69,6 +69,12 @@ export function DocumentFormDialog({
     grandTotal: 0,
   })
   const formRef = useRef<HTMLFormElement>(null)
+
+  // Memoized callback to prevent infinite re-renders
+  const handleLineItemsChange = useCallback((items: LineItemFormData[], totals: CalculatedTotals) => {
+    setLineItems(items)
+    setCalculatedTotals(totals)
+  }, [])
 
   // Load clients and payment terms when dialog opens
   useEffect(() => {
@@ -415,12 +421,7 @@ export function DocumentFormDialog({
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                   Line Items <span className="text-destructive">*</span>
                 </h3>
-                <LineItemsForm
-                  onChange={(items, totals) => {
-                    setLineItems(items)
-                    setCalculatedTotals(totals)
-                  }}
-                />
+                <LineItemsForm onChange={handleLineItemsChange} />
               </div>
 
               {/* Notes - Collapsed */}
