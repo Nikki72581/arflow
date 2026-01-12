@@ -106,8 +106,16 @@ export async function createCheckoutSession(
     // Initialize Stripe client
     const stripe = initializeStripe(credentials);
 
-    // Get base URL from environment
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    // Get base URL from environment - REQUIRED for production
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+    if (!baseUrl) {
+      console.error('NEXT_PUBLIC_APP_URL environment variable is not set');
+      return {
+        success: false,
+        error: 'Payment system is not properly configured. Please contact support.',
+      };
+    }
 
     // Create Checkout Session
     // Use embedded mode for "pay_now", hosted mode for "generate_link"

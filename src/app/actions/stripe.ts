@@ -8,6 +8,7 @@ import {
   decryptGatewayCredential,
 } from "@/lib/payment-gateway/encryption";
 import { testStripeConnection as testStripeConnectionClient } from "@/lib/payment-gateway/stripe/client";
+import Stripe from "stripe";
 
 /**
  * Get Stripe settings for the current organization
@@ -46,6 +47,80 @@ export async function getStripeSettings() {
 }
 
 /**
+ * Automatically create a webhook endpoint in Stripe
+ * Returns the webhook secret
+ */
+async function createStripeWebhook(
+  secretKey: string,
+  isProduction: boolean
+): Promise<{ success: boolean; webhookSecret?: string; webhookEndpointId?: string; error?: string }> {
+  try {
+    // Get the app URL from environment
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+    if (!baseUrl) {
+      return {
+        success: false,
+        error:
+          "NEXT_PUBLIC_APP_URL environment variable is not set. Webhook cannot be created automatically.",
+      };
+    }
+
+    // Initialize Stripe client
+    const stripe = new Stripe(secretKey, {
+      apiVersion: "2025-12-15.clover",
+      typescript: true,
+    });
+
+    const webhookUrl = `${baseUrl}/api/webhooks/stripe`;
+
+    // Check if webhook already exists for this URL
+    const existingWebhooks = await stripe.webhookEndpoints.list({
+      limit: 100,
+    });
+
+    const existingWebhook = existingWebhooks.data.find(
+      (webhook) => webhook.url === webhookUrl
+    );
+
+    if (existingWebhook) {
+      // Webhook already exists, return its secret
+      console.log("Webhook endpoint already exists:", existingWebhook.id);
+      return {
+        success: true,
+        webhookSecret: existingWebhook.secret,
+        webhookEndpointId: existingWebhook.id,
+      };
+    }
+
+    // Create new webhook endpoint
+    const webhook = await stripe.webhookEndpoints.create({
+      url: webhookUrl,
+      enabled_events: [
+        "checkout.session.completed",
+        "checkout.session.expired",
+        "payment_intent.payment_failed",
+      ],
+      description: `ARFlow ${isProduction ? "Production" : "Test"} Webhook`,
+    });
+
+    console.log("Created webhook endpoint:", webhook.id);
+
+    return {
+      success: true,
+      webhookSecret: webhook.secret,
+      webhookEndpointId: webhook.id,
+    };
+  } catch (error: any) {
+    console.error("Error creating webhook:", error);
+    return {
+      success: false,
+      error: error.message || "Failed to create webhook",
+    };
+  }
+}
+
+/**
  * Create or update Stripe settings
  */
 export async function upsertStripeSettings(data: {
@@ -55,6 +130,7 @@ export async function upsertStripeSettings(data: {
   isProduction: boolean;
   requireCVV: boolean;
   requireBillingAddress: boolean;
+  autoCreateWebhook?: boolean; // New option to auto-create webhook
 }) {
   const { userId } = await auth();
   if (!userId) {
@@ -69,11 +145,33 @@ export async function upsertStripeSettings(data: {
     throw new Error("Unauthorized - Admin access required");
   }
 
+  // Automatically create webhook if requested and no webhook secret provided
+  let webhookSecret = data.webhookSecret;
+  let webhookEndpointId: string | undefined;
+  let webhookCreationResult;
+
+  if (data.autoCreateWebhook && !webhookSecret) {
+    console.log("Attempting to auto-create webhook endpoint in Stripe...");
+    webhookCreationResult = await createStripeWebhook(
+      data.secretKey,
+      data.isProduction
+    );
+
+    if (webhookCreationResult.success) {
+      webhookSecret = webhookCreationResult.webhookSecret;
+      webhookEndpointId = webhookCreationResult.webhookEndpointId;
+      console.log("Webhook created successfully:", webhookEndpointId);
+    } else {
+      console.warn("Failed to auto-create webhook:", webhookCreationResult.error);
+      // Continue without webhook - user can add it manually later
+    }
+  }
+
   // Encrypt the credentials
   const encryptedSecretKey = encryptGatewayCredential(data.secretKey);
   const encryptedPublishableKey = encryptGatewayCredential(data.publishableKey);
-  const encryptedWebhookSecret = data.webhookSecret
-    ? encryptGatewayCredential(data.webhookSecret)
+  const encryptedWebhookSecret = webhookSecret
+    ? encryptGatewayCredential(webhookSecret)
     : null;
 
   // Check if settings already exist
@@ -94,6 +192,7 @@ export async function upsertStripeSettings(data: {
         encryptedSecretKey,
         encryptedPublishableKey,
         encryptedWebhookSecret,
+        webhookEndpointId: webhookEndpointId || existing.webhookEndpointId, // Keep existing if not updated
         isProduction: data.isProduction,
         requireCVV: data.requireCVV,
         requireBillingAddress: data.requireBillingAddress,
@@ -107,6 +206,7 @@ export async function upsertStripeSettings(data: {
         encryptedSecretKey,
         encryptedPublishableKey,
         encryptedWebhookSecret,
+        webhookEndpointId,
         isProduction: data.isProduction,
         requireCVV: data.requireCVV,
         requireBillingAddress: data.requireBillingAddress,
@@ -125,6 +225,8 @@ export async function upsertStripeSettings(data: {
       encryptedPublishableKey: "****",
       encryptedWebhookSecret: settings.encryptedWebhookSecret ? "****" : null,
     },
+    webhookCreated: webhookCreationResult?.success || false,
+    webhookError: webhookCreationResult?.error,
   };
 }
 

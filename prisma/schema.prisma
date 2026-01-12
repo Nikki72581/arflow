@@ -740,9 +740,10 @@ model StripeIntegration {
   organizationId String @unique
 
   // API Credentials (encrypted)
-  encryptedSecretKey      String // Encrypted Secret Key (sk_test_... or sk_live_...)
-  encryptedPublishableKey String // Encrypted Publishable Key (pk_test_... or pk_live_...)
+  encryptedSecretKey      String  // Encrypted Secret Key (sk_test_... or sk_live_...)
+  encryptedPublishableKey String  // Encrypted Publishable Key (pk_test_... or pk_live_...)
   encryptedWebhookSecret  String? // Optional: Encrypted webhook signing secret
+  webhookEndpointId       String? // Stripe webhook endpoint ID (we_...) if auto-created
 
   // Environment
   isProduction Boolean @default(false) // false = test mode, true = live mode

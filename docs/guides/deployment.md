@@ -77,8 +77,10 @@ NEXT_PUBLIC_CLERK_SIGN_UP_URL="/sign-up"
 #### Application
 ```env
 COMPANY_NAME="Your Company Name"
-NEXT_PUBLIC_APP_URL="https://yourdomain.com"
+NEXT_PUBLIC_APP_URL="https://yourdomain.com"  # REQUIRED for Stripe payment redirects
 ```
+
+**CRITICAL:** `NEXT_PUBLIC_APP_URL` must be set to your production domain for Stripe checkout to work properly. Without this, users will be redirected to localhost after completing payments.
 
 ### Optional Variables
 
@@ -179,7 +181,27 @@ Visit your deployed URL and check:
    - DMARC record (optional but recommended)
 5. Verify domain
 
-### 4. Test Critical Features
+### 4. Configure Stripe Webhooks (if using Stripe payments)
+
+**CRITICAL:** Stripe webhooks are required for payment processing to work correctly.
+
+1. Go to [Stripe Dashboard](https://dashboard.stripe.com) → Developers → Webhooks
+2. Click "Add endpoint"
+3. Set endpoint URL: `https://yourdomain.com/api/webhooks/stripe`
+4. Select events to listen for:
+   - `checkout.session.completed`
+   - `checkout.session.expired`
+   - `payment_intent.payment_failed`
+5. Click "Add endpoint"
+6. Copy the "Signing secret" (starts with `whsec_`)
+7. Add to your Stripe integration settings in the app:
+   - Go to your ARFlow app → Settings → Payment Gateway
+   - Configure Stripe integration
+   - Paste the webhook secret
+
+**Important:** Without webhooks configured, payments will appear as "Processing" indefinitely even though the charge succeeded on Stripe.
+
+### 5. Test Critical Features
 
 - [ ] User registration and login
 - [ ] Organization creation
@@ -188,8 +210,9 @@ Visit your deployed URL and check:
 - [ ] PDF generation
 - [ ] Email notifications (if configured)
 - [ ] Acumatica integration (if configured)
+- [ ] Stripe payment flow (if configured)
 
-### 5. Set Up Custom Domain (Optional)
+### 6. Set Up Custom Domain (Optional)
 
 1. Go to Vercel Dashboard → Your Project → Settings → Domains
 2. Add your custom domain
@@ -364,6 +387,28 @@ To temporarily skip tests (not recommended):
 2. Redirect URLs updated for production
 3. API keys are for correct Clerk instance
 4. Users added to organization
+
+### Stripe Payment Issues
+
+**Problem:** Users redirected to localhost after payment
+**Solution:**
+1. Set `NEXT_PUBLIC_APP_URL` to your production domain in Vercel environment variables
+2. Redeploy the application
+3. Verify the variable is set correctly in deployment logs
+
+**Problem:** Payments stuck in "Processing" status
+**Solution:**
+1. Verify webhook is configured in Stripe Dashboard
+2. Check webhook endpoint URL matches your domain: `https://yourdomain.com/api/webhooks/stripe`
+3. Ensure webhook secret is saved in your Stripe integration settings
+4. Check Vercel function logs for webhook errors
+5. In Stripe Dashboard, view webhook delivery attempts to see if they're failing
+
+**Problem:** Webhook signature verification failed
+**Solution:**
+1. Verify you're using the correct webhook secret for your environment (test vs live)
+2. Check that the webhook secret in ARFlow matches the one in Stripe Dashboard
+3. Ensure the webhook endpoint is accessible (not behind authentication)
 
 ## Performance Optimization
 

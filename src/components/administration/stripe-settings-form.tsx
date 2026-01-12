@@ -34,6 +34,7 @@ export function StripeSettingsForm({ settings }: StripeSettingsFormProps) {
     isProduction: settings?.isProduction || false,
     requireCVV: settings?.requireCVV ?? true,
     requireBillingAddress: settings?.requireBillingAddress ?? true,
+    autoCreateWebhook: true, // Default to true for convenience
   });
 
   async function handleSubmit(e: React.FormEvent) {
@@ -47,8 +48,17 @@ export function StripeSettingsForm({ settings }: StripeSettingsFormProps) {
         throw new Error("Secret Key and Publishable Key are required");
       }
 
-      await upsertStripeSettings(formData);
-      setSuccess("Settings saved successfully");
+      const result = await upsertStripeSettings(formData);
+
+      // Build success message based on webhook creation result
+      let successMessage = "Settings saved successfully";
+      if (result.webhookCreated) {
+        successMessage += ". Webhook endpoint created automatically in Stripe!";
+      } else if (result.webhookError) {
+        successMessage += `. Note: Webhook creation failed (${result.webhookError}). You can add it manually in Stripe Dashboard.`;
+      }
+
+      setSuccess(successMessage);
       router.refresh();
 
       // Clear the sensitive fields for security
@@ -242,8 +252,27 @@ export function StripeSettingsForm({ settings }: StripeSettingsFormProps) {
                   placeholder="whsec_... (for webhook verification)"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Used to verify webhook signatures. Not required for basic payment processing.
+                  Leave blank to auto-create webhook, or enter manually if you already created one in Stripe Dashboard.
                 </p>
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <div className="space-y-0.5">
+                  <Label htmlFor="autoCreateWebhook" className="cursor-pointer">
+                    Auto-Create Webhook Endpoint
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Automatically create webhook endpoint in your Stripe account (recommended)
+                  </p>
+                </div>
+                <Switch
+                  id="autoCreateWebhook"
+                  checked={formData.autoCreateWebhook}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, autoCreateWebhook: checked })
+                  }
+                  disabled={!!formData.webhookSecret}
+                />
               </div>
 
               <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
@@ -320,28 +349,53 @@ export function StripeSettingsForm({ settings }: StripeSettingsFormProps) {
         </CardContent>
       </Card>
 
-      {/* Security Notice */}
-      <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
-            <Shield className="h-5 w-5" />
-            Security Notice
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
-          <p>
-            Your API credentials are encrypted before being stored in the database.
-          </p>
-          <p>
-            Always use test mode keys (sk_test_...) while setting up and testing your integration.
-            Switch to live mode only when you're ready to process real transactions.
-          </p>
-          <p>
-            Never share your Secret Key with anyone. The Publishable Key can be safely used in
-            client-side code.
-          </p>
-        </CardContent>
-      </Card>
+      {/* Info Cards */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
+              <Shield className="h-5 w-5" />
+              Security Notice
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
+            <p>
+              Your API credentials are encrypted before being stored in the database.
+            </p>
+            <p>
+              Always use test mode keys (sk_test_...) while setting up and testing your integration.
+              Switch to live mode only when you're ready to process real transactions.
+            </p>
+            <p>
+              Never share your Secret Key with anyone. The Publishable Key can be safely used in
+              client-side code.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-green-900 dark:text-green-100">
+              <CheckCircle2 className="h-5 w-5" />
+              Automatic Webhook Setup
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-green-800 dark:text-green-200 space-y-2">
+            <p>
+              When you enable "Auto-Create Webhook Endpoint", we'll automatically create a webhook
+              endpoint in your Stripe account pointing to your application.
+            </p>
+            <p>
+              This eliminates the need to manually configure webhooks in the Stripe Dashboard.
+              The webhook secret will be saved automatically.
+            </p>
+            <p>
+              <strong>Requirements:</strong> NEXT_PUBLIC_APP_URL must be set in your environment
+              variables for automatic webhook creation to work.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
