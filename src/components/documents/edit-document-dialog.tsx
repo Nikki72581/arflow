@@ -113,7 +113,6 @@ export function EditDocumentDialog({
       referenceNumber: getString('referenceNumber'),
       documentDate: new Date(documentDate),
       dueDate: dueDate ? new Date(dueDate) : undefined,
-      description: getString('description'),
       notes: getString('notes'),
       customerNotes: getString('customerNotes'),
       status: getString('status') as DocumentStatus,
@@ -296,22 +295,12 @@ export function EditDocumentDialog({
                 )}
               </div>
 
-              {/* Description and Notes */}
+              {/* Notes */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                  Description & Notes
+                  Notes
                 </h3>
                 <div className="grid gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      name="description"
-                      defaultValue={document.description || ''}
-                      rows={3}
-                    />
-                  </div>
-
                   <div className="grid gap-2">
                     <Label htmlFor="notes">Internal notes</Label>
                     <Textarea

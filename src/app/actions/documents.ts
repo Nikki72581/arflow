@@ -355,7 +355,6 @@ export async function updateDocument(
     referenceNumber?: string;
     documentDate?: Date;
     dueDate?: Date;
-    description?: string;
     notes?: string;
     customerNotes?: string;
     status?: DocumentStatus;
@@ -400,7 +399,6 @@ export async function updateDocument(
     referenceNumber: data.referenceNumber,
     documentDate: data.documentDate,
     dueDate: data.dueDate,
-    description: data.description,
     notes: data.notes,
     customerNotes: data.customerNotes,
     status: data.status,
