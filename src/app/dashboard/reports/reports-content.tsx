@@ -288,61 +288,63 @@ export function ReportsContent() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Rank</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead className="text-right">Total Invoices</TableHead>
-                      <TableHead className="text-right">Total Payments</TableHead>
-                      <TableHead className="text-right">Invoice Count</TableHead>
-                      <TableHead className="text-right">Collection Rate</TableHead>
-                      <TableHead className="text-right">Avg Invoice Amount</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {performers.map((performer, index) => {
-                      const averageInvoiceAmount = performer.commissionsCount
-                        ? performer.totalSales / performer.commissionsCount
-                        : 0
+                <div className="text-xs">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Rank</TableHead>
+                        <TableHead className="text-xs">Customer</TableHead>
+                        <TableHead className="text-right text-xs">Total Invoices</TableHead>
+                        <TableHead className="text-right text-xs">Total Payments</TableHead>
+                        <TableHead className="text-right text-xs">Invoice Count</TableHead>
+                        <TableHead className="text-right text-xs">Collection Rate</TableHead>
+                        <TableHead className="text-right text-xs">Avg Invoice Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {performers.map((performer, index) => {
+                        const averageInvoiceAmount = performer.commissionsCount
+                          ? performer.totalSales / performer.commissionsCount
+                          : 0
 
-                      return (
-                        <TableRow key={performer.id}>
-                          <TableCell>
-                            <Badge variant={index < 3 ? 'default' : 'outline'}>
-                              #{index + 1}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">{performer.name}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {performer.email}
+                        return (
+                          <TableRow key={performer.id}>
+                            <TableCell>
+                              <Badge variant={index < 3 ? 'default' : 'outline'} className="text-[10px] px-1.5 py-0">
+                                #{index + 1}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium text-xs">{performer.name}</div>
+                                <div className="text-[10px] text-muted-foreground">
+                                  {performer.email}
+                                </div>
                               </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {formatCurrency(performer.totalSales)}
-                          </TableCell>
-                          <TableCell className="text-right font-medium text-emerald-600">
-                            {formatCurrency(performer.totalCommissions)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {performer.commissionsCount}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Badge variant="secondary">
-                              {performer.conversionRate.toFixed(2)}%
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {formatCurrency(averageInvoiceAmount)}
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
+                            </TableCell>
+                            <TableCell className="text-right font-medium text-xs">
+                              {formatCurrency(performer.totalSales)}
+                            </TableCell>
+                            <TableCell className="text-right font-medium text-emerald-600 text-xs">
+                              {formatCurrency(performer.totalCommissions)}
+                            </TableCell>
+                            <TableCell className="text-right text-xs">
+                              {performer.commissionsCount}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                {performer.conversionRate.toFixed(2)}%
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right text-xs">
+                              {formatCurrency(averageInvoiceAmount)}
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </div>
