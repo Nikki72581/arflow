@@ -297,7 +297,6 @@ export function ClientFormDialog({
                       <SelectValue placeholder="Select payment terms" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No payment terms</SelectItem>
                       {paymentTerms.map((term) => (
                         <SelectItem key={term.id} value={term.id}>
                           {term.name}
