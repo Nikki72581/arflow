@@ -3,7 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { PaymentMethod, PaymentGatewayProvider } from "@prisma/client";
+import { PaymentMethod, PaymentGatewayProvider, PaymentStatus } from "@prisma/client";
 import { getDecryptedCredentials } from "./authorize-net";
 import { getDecryptedStripeCredentials } from "./stripe";
 import { processStripePayment } from "@/lib/payment-gateway/stripe/client";
@@ -495,10 +495,16 @@ export async function getPayments({
   customerId,
   page = 1,
   pageSize = 25,
+  status,
+  search,
+  paymentMethod,
 }: {
   customerId?: string;
   page?: number;
   pageSize?: number;
+  status?: PaymentStatus;
+  search?: string;
+  paymentMethod?: PaymentMethod;
 }) {
   const { userId } = await auth();
   if (!userId) {
@@ -521,6 +527,22 @@ export async function getPayments({
 
   if (customerId) {
     where.customerId = customerId;
+  }
+
+  if (status) {
+    where.status = status;
+  }
+
+  if (paymentMethod) {
+    where.paymentMethod = paymentMethod;
+  }
+
+  if (search) {
+    where.OR = [
+      { paymentNumber: { contains: search, mode: "insensitive" } },
+      { gatewayTransactionId: { contains: search, mode: "insensitive" } },
+      { customer: { companyName: { contains: search, mode: "insensitive" } } },
+    ];
   }
 
   const [payments, total] = await Promise.all([
@@ -708,5 +730,161 @@ export async function markSessionCancelled(sessionId: string) {
   } catch (error: any) {
     console.error("Error marking session as cancelled:", error);
     return { success: false, error: error.message || "Failed to update session" };
+  }
+}
+
+export async function getPaymentById(id: string) {
+  const { userId } = await auth();
+  if (!userId) {
+    throw new Error("Unauthorized");
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { clerkId: userId },
+  });
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  const payment = await prisma.customerPayment.findFirst({
+    where: {
+      id,
+      organizationId: user.organizationId,
+    },
+    include: {
+      customer: {
+        select: {
+          id: true,
+          companyName: true,
+          customerNumber: true,
+          email: true,
+          phone: true,
+        },
+      },
+      paymentApplications: {
+        include: {
+          arDocument: {
+            select: {
+              id: true,
+              documentNumber: true,
+              documentType: true,
+              totalAmount: true,
+              dueDate: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "asc",
+        },
+      },
+    },
+  });
+
+  return payment;
+}
+
+export async function voidPayment(id: string, reason?: string) {
+  const { userId } = await auth();
+  if (!userId) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { clerkId: userId },
+  });
+
+  if (!user || user.role !== "ADMIN") {
+    return { success: false, error: "Only admins can void payments" };
+  }
+
+  try {
+    // Get the payment with its applications
+    const payment = await prisma.customerPayment.findFirst({
+      where: {
+        id,
+        organizationId: user.organizationId,
+      },
+      include: {
+        paymentApplications: {
+          include: {
+            arDocument: true,
+          },
+        },
+      },
+    });
+
+    if (!payment) {
+      return { success: false, error: "Payment not found" };
+    }
+
+    if (payment.status !== "APPLIED") {
+      return { success: false, error: "Only applied payments can be voided" };
+    }
+
+    // Use a transaction to update payment and documents atomically
+    await prisma.$transaction(async (tx) => {
+      // Update payment status to VOID
+      await tx.customerPayment.update({
+        where: { id },
+        data: {
+          status: "VOID",
+          notes: reason ? `${payment.notes || ""}\n\nVoided: ${reason}`.trim() : payment.notes,
+        },
+      });
+
+      // Restore document balances
+      for (const application of payment.paymentApplications) {
+        const document = application.arDocument;
+        const newBalance = document.balanceDue + application.amountApplied;
+        const newAmountPaid = document.amountPaid - application.amountApplied;
+
+        let newStatus = document.status;
+        if (newAmountPaid === 0) {
+          newStatus = "OPEN";
+        } else if (newAmountPaid > 0 && newBalance > 0) {
+          newStatus = "PARTIAL";
+        }
+
+        await tx.arDocument.update({
+          where: { id: document.id },
+          data: {
+            balanceDue: newBalance,
+            amountPaid: newAmountPaid,
+            status: newStatus,
+            paidDate: newStatus === "PAID" ? document.paidDate : null,
+          },
+        });
+      }
+
+      // Create audit log entry
+      await tx.auditLog.create({
+        data: {
+          organizationId: user.organizationId,
+          userId: user.id,
+          action: "VOID_PAYMENT",
+          entityType: "PAYMENT",
+          entityId: id,
+          changes: {
+            paymentNumber: payment.paymentNumber,
+            amount: payment.amount,
+            reason,
+          },
+        },
+      });
+    });
+
+    // Revalidate affected pages
+    revalidatePath("/dashboard/payments");
+    revalidatePath(`/dashboard/payments/${id}`);
+    revalidatePath("/dashboard/documents");
+    payment.paymentApplications.forEach((app) => {
+      revalidatePath(`/dashboard/documents/${app.arDocumentId}`);
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error voiding payment:", error);
+    return { success: false, error: error.message || "Failed to void payment" };
   }
 }

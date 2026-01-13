@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   Menu,
   Calendar,
+  CreditCard,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -56,6 +57,13 @@ const navigation: NavItem[] = [
     href: '/dashboard/documents',
     icon: FileText,
     iconColor: 'text-purple-600 dark:text-purple-400',
+    adminOnly: true,
+  },
+  {
+    title: 'Payments',
+    href: '/dashboard/payments',
+    icon: CreditCard,
+    iconColor: 'text-green-600 dark:text-green-400',
     adminOnly: true,
   },
   {

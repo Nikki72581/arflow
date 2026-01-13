@@ -3,6 +3,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
 import { generatePublicShareLink } from "./public-invoices";
+import { sendEmail, isEmailConfigured } from "@/lib/email";
+import { logInvoiceEmailed, logEmailFailed } from "@/lib/audit-log";
 
 interface SendInvoiceEmailParams {
   documentId: string;
@@ -32,6 +34,14 @@ export async function sendInvoiceEmail(params: SendInvoiceEmailParams): Promise<
   error?: string;
 }> {
   try {
+    // Check if email service is configured
+    if (!isEmailConfigured()) {
+      return {
+        success: false,
+        error: "Email service not configured. Please add RESEND_API_KEY to your environment variables.",
+      };
+    }
+
     const { userId } = await auth();
     if (!userId) {
       return { success: false, error: "Unauthorized" };
@@ -147,29 +157,57 @@ This is an automated email from ${document.organization.name}.
 ${document.organization.email ? `For questions, contact us at ${document.organization.email}` : ''}
     `.trim();
 
-    // TODO: Integrate with actual email service
-    // Example with Resend:
-    /*
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    await resend.emails.send({
-      from: process.env.EMAIL_FROM || `invoices@${document.organization.slug}.com`,
+    // Send the email using Resend
+    const emailResult = await sendEmail({
       to: params.to,
       subject: params.subject,
       html: emailHtml,
-      text: emailText,
+      replyTo: document.organization.email || undefined,
     });
-    */
 
-    // For now, log the email content (for development/testing)
-    console.log('=== EMAIL WOULD BE SENT ===');
-    console.log('To:', params.to);
-    console.log('Subject:', params.subject);
-    console.log('Share URL:', shareUrl);
-    console.log('HTML Length:', emailHtml.length);
-    console.log('===========================');
+    if (!emailResult.success) {
+      // Log failed email attempt
+      await logEmailFailed({
+        invoiceId: document.id,
+        invoiceNumber: document.documentNumber,
+        recipientEmail: params.to,
+        error: emailResult.error || "Unknown error",
+        sentBy: {
+          id: user.id,
+          name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+          email: user.email,
+        },
+        organizationId: user.organizationId,
+      });
 
-    // Return success for now
-    // In production, this should only return success after the email is actually sent
+      return {
+        success: false,
+        error: emailResult.error || "Failed to send email",
+      };
+    }
+
+    // Log successful send for audit purposes
+    console.log('Invoice email sent successfully:', {
+      to: params.to,
+      documentNumber: document.documentNumber,
+      emailId: emailResult.data?.id,
+    });
+
+    // Create audit log entry
+    await logInvoiceEmailed({
+      invoiceId: document.id,
+      invoiceNumber: document.documentNumber,
+      recipientEmail: params.to,
+      recipientName: document.customer?.name || params.to,
+      sentBy: {
+        id: user.id,
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+        email: user.email,
+      },
+      organizationId: user.organizationId,
+      emailId: emailResult.data?.id,
+    });
+
     return {
       success: true,
     };
@@ -184,25 +222,76 @@ ${document.organization.email ? `For questions, contact us at ${document.organiz
  * Test email configuration
  * This can be called to verify email service is properly configured
  */
-export async function testEmailConfiguration(): Promise<{
+export async function testEmailConfiguration(testEmailAddress: string): Promise<{
   success: boolean;
   error?: string;
 }> {
   try {
-    // TODO: Test your email service connection
-    // Example with Resend:
-    /*
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    await resend.emails.send({
-      from: process.env.EMAIL_FROM || 'test@example.com',
-      to: 'test@example.com',
-      subject: 'Test Email',
-      html: '<p>This is a test email</p>',
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { clerkId: userId },
+      include: { organization: true },
     });
-    */
+
+    if (!user || user.role !== "ADMIN") {
+      return { success: false, error: "Only admins can test email configuration" };
+    }
+
+    // Check if API key is configured
+    if (!process.env.RESEND_API_KEY) {
+      return {
+        success: false,
+        error: "Email service not configured. Please add RESEND_API_KEY to your environment variables.",
+      };
+    }
+
+    // Send test email
+    const result = await sendEmail({
+      to: testEmailAddress,
+      subject: `Test Email from ${user.organization.name}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #9333ea 0%, #a855f7 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+              <h1 style="color: white; margin: 0; font-size: 28px;">✓ Email Configuration Test</h1>
+            </div>
+            <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px;">
+              <h2 style="color: #1f2937; margin-top: 0;">Success!</h2>
+              <p>Your email service is properly configured and working.</p>
+              <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #9333ea;">
+                <p style="margin: 0; color: #6b7280; font-size: 14px;">Configuration Details:</p>
+                <p style="margin: 10px 0; font-size: 16px;"><strong>Organization:</strong> ${user.organization.name}</p>
+                <p style="margin: 10px 0; font-size: 16px;"><strong>From Email:</strong> ${process.env.RESEND_FROM_EMAIL || 'noreply@arflow.app'}</p>
+                <p style="margin: 10px 0; font-size: 16px;"><strong>Test Date:</strong> ${new Date().toLocaleString()}</p>
+              </div>
+              <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+                This is an automated test email from ${user.organization.name}.
+              </p>
+            </div>
+          </body>
+        </html>
+      `,
+    });
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error || "Failed to send test email",
+      };
+    }
 
     return { success: true };
   } catch (error: any) {
-    return { success: false, error: error.message };
+    console.error("Error testing email configuration:", error);
+    return { success: false, error: error.message || "Failed to test email configuration" };
   }
 }

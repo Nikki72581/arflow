@@ -13,11 +13,33 @@ export const EMAIL_CONFIG = {
 
 export { resend }
 
-// Email types
-export type EmailType = 
-  | 'commission_approved'
-  | 'commission_paid'
-  | 'bulk_payout_complete'
+// Check if email service is configured
+export function isEmailConfigured(): boolean {
+  return !!process.env.RESEND_API_KEY
+}
+
+// Get email configuration status with details
+export function getEmailConfigStatus(): {
+  configured: boolean
+  apiKeyPresent: boolean
+  fromEmail: string
+  replyToEmail?: string
+  missingConfig: string[]
+} {
+  const missingConfig: string[] = []
+
+  if (!process.env.RESEND_API_KEY) {
+    missingConfig.push('RESEND_API_KEY')
+  }
+
+  return {
+    configured: missingConfig.length === 0,
+    apiKeyPresent: !!process.env.RESEND_API_KEY,
+    fromEmail: EMAIL_CONFIG.from,
+    replyToEmail: EMAIL_CONFIG.replyTo,
+    missingConfig,
+  }
+}
 
 // Email sending function with error handling
 export async function sendEmail(params: {

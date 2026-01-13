@@ -11,6 +11,8 @@ export type AuditAction =
   | 'invoice_updated'
   | 'invoice_deleted'
   | 'invoice_voided'
+  | 'invoice_emailed'
+  | 'invoice_shared'
   | 'credit_memo_created'
   | 'debit_memo_created'
   // Payment actions
@@ -30,6 +32,9 @@ export type AuditAction =
   // Integration actions
   | 'integration_sync'
   | 'integration_sync_reverted'
+  // Email actions
+  | 'email_sent'
+  | 'email_failed'
 
 export type EntityType =
   | 'invoice'
@@ -290,5 +295,75 @@ export async function getRecentActivity(params: {
   return getAuditLogs({
     organizationId: params.organizationId,
     limit: params.limit || 10,
+  })
+}
+
+/**
+ * Create audit log for invoice email sent
+ */
+export async function logInvoiceEmailed(params: {
+  invoiceId: string
+  invoiceNumber: string
+  recipientEmail: string
+  recipientName: string
+  sentBy: {
+    id: string
+    name: string
+    email: string
+  }
+  organizationId: string
+  emailId?: string
+  ipAddress?: string
+}) {
+  return createAuditLog({
+    userId: params.sentBy.id,
+    userName: params.sentBy.name,
+    userEmail: params.sentBy.email,
+    action: 'invoice_emailed',
+    entityType: 'invoice',
+    entityId: params.invoiceId,
+    description: `Emailed invoice ${params.invoiceNumber} to ${params.recipientName} (${params.recipientEmail})`,
+    metadata: {
+      invoiceNumber: params.invoiceNumber,
+      recipientEmail: params.recipientEmail,
+      recipientName: params.recipientName,
+      emailId: params.emailId,
+    },
+    organizationId: params.organizationId,
+    ipAddress: params.ipAddress,
+  })
+}
+
+/**
+ * Create audit log for failed email send
+ */
+export async function logEmailFailed(params: {
+  invoiceId: string
+  invoiceNumber: string
+  recipientEmail: string
+  error: string
+  sentBy: {
+    id: string
+    name: string
+    email: string
+  }
+  organizationId: string
+  ipAddress?: string
+}) {
+  return createAuditLog({
+    userId: params.sentBy.id,
+    userName: params.sentBy.name,
+    userEmail: params.sentBy.email,
+    action: 'email_failed',
+    entityType: 'invoice',
+    entityId: params.invoiceId,
+    description: `Failed to email invoice ${params.invoiceNumber} to ${params.recipientEmail}: ${params.error}`,
+    metadata: {
+      invoiceNumber: params.invoiceNumber,
+      recipientEmail: params.recipientEmail,
+      error: params.error,
+    },
+    organizationId: params.organizationId,
+    ipAddress: params.ipAddress,
   })
 }

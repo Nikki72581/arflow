@@ -8,9 +8,10 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { updateUserProfile, getUserProfile, updateNotificationPreferences, updateThemePreference } from '@/app/actions/settings'
-import { User, Bell, Shield, Loader2, ChevronRight, Settings, Palette, Sun, Moon, Monitor, Users, FileText, CreditCard, Wallet, Plug } from 'lucide-react'
+import { User, Bell, Shield, Loader2, ChevronRight, Settings, Palette, Sun, Moon, Monitor, Users, FileText, CreditCard, Wallet, Plug, Mail } from 'lucide-react'
 import { useTheme } from '@/components/providers/theme-provider'
 import Link from 'next/link'
+import { EmailSettings } from '@/components/administration/email-settings'
 
 interface UserProfile {
   id: string
@@ -300,6 +301,11 @@ export default function SettingsPage() {
       </Card>
 
       <Separator className="bg-indigo-500/20" />
+
+      {/* Email Configuration (Admin Only) */}
+      {isAdmin && <EmailSettings />}
+
+      {isAdmin && <Separator className="bg-indigo-500/20" />}
 
       {/* Profile Settings */}
       <Card>
