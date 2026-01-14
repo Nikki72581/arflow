@@ -13,9 +13,10 @@ export const metadata = {
 export default async function PaymentDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const payment = await getPaymentById(params.id);
+  const { id } = await params;
+  const payment = await getPaymentById(id);
 
   if (!payment) {
     notFound();

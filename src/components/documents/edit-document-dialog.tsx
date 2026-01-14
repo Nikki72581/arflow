@@ -36,6 +36,12 @@ export function EditDocumentDialog({
   document,
   trigger,
 }: EditDocumentDialogProps) {
+  const toInputDate = (value: string | Date | null | undefined) => {
+    if (!value) return ''
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0]
+  }
+
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -43,12 +49,8 @@ export function EditDocumentDialog({
   const [showSuccess, setShowSuccess] = useState(false)
   const [paymentTerms, setPaymentTerms] = useState<any[]>([])
   const [selectedPaymentTermId, setSelectedPaymentTermId] = useState<string>(document.paymentTermId || '')
-  const [documentDate, setDocumentDate] = useState<string>(
-    new Date(document.documentDate).toISOString().split('T')[0]
-  )
-  const [dueDate, setDueDate] = useState<string>(
-    document.dueDate ? new Date(document.dueDate).toISOString().split('T')[0] : ''
-  )
+  const [documentDate, setDocumentDate] = useState<string>(toInputDate(document.documentDate))
+  const [dueDate, setDueDate] = useState<string>(toInputDate(document.dueDate))
   const [dueDateManuallySet, setDueDateManuallySet] = useState(!!document.dueDate)
   const [paymentTermInfo, setPaymentTermInfo] = useState<any>(null)
   const formRef = useRef<HTMLFormElement>(null)

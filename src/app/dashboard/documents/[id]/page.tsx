@@ -13,9 +13,10 @@ export const metadata = {
 export default async function DocumentDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const document = await getDocument(params.id);
+  const { id } = await params;
+  const document = await getDocument(id);
 
   if (!document) {
     notFound();
