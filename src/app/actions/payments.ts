@@ -862,10 +862,11 @@ export async function voidPayment(id: string, reason?: string) {
         data: {
           organizationId: user.organizationId,
           userId: user.id,
-          action: "VOID_PAYMENT",
-          entityType: "PAYMENT",
+          action: "payment_voided",
+          entityType: "payment",
           entityId: id,
-          changes: {
+          description: `Voided payment ${payment.paymentNumber}${reason ? `: ${reason}` : ""}`,
+          metadata: {
             paymentNumber: payment.paymentNumber,
             amount: payment.amount,
             reason,
