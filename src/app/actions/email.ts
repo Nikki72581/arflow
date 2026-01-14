@@ -198,7 +198,7 @@ ${document.organization.email ? `For questions, contact us at ${document.organiz
       invoiceId: document.id,
       invoiceNumber: document.documentNumber,
       recipientEmail: params.to,
-      recipientName: document.customer?.name || params.to,
+      recipientName: document.customer.companyName || params.to,
       sentBy: {
         id: user.id,
         name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
