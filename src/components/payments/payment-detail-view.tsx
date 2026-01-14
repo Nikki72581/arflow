@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -24,9 +24,12 @@ import {
   Mail,
   Phone,
   ShieldCheck,
+  ExternalLink,
 } from "lucide-react";
 import { VoidPaymentDialog } from "./void-payment-dialog";
 import { PaymentExportButton } from "./payment-export-button";
+import { PaymentApplyDialog } from "./payment-apply-dialog";
+import { PaymentCheckInfoDialog } from "./payment-check-info-dialog";
 
 interface PaymentDetailViewProps {
   payment: any;
@@ -63,6 +66,12 @@ export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
     }
   };
 
+  const totalApplied = payment.paymentApplications.reduce(
+    (sum: number, application: any) => sum + application.amountApplied,
+    0
+  );
+  const remainingAmount = Math.max(payment.amount - totalApplied, 0);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -87,6 +96,25 @@ export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
         </div>
         <div className="flex gap-2">
           <PaymentExportButton payments={[payment]} variant="detail" />
+          {payment.status === "PENDING" && payment.checkoutSessionUrl && (
+            <Button size="sm" variant="outline" asChild>
+              <a
+                href={payment.checkoutSessionUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Run Charge
+              </a>
+            </Button>
+          )}
+          {payment.status !== "VOID" && (
+            <PaymentCheckInfoDialog
+              paymentId={payment.id}
+              currentMethod={payment.paymentMethod}
+              referenceNumber={payment.referenceNumber}
+            />
+          )}
           {payment.status === "APPLIED" && (
             <VoidPaymentDialog
               paymentId={payment.id}
@@ -192,7 +220,73 @@ export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
                     </p>
                   </div>
                 )}
+
+                {(payment.checkoutSessionStatus ||
+                  payment.stripeCheckoutSessionId ||
+                  payment.checkoutMode ||
+                  payment.sessionExpiresAt ||
+                  payment.checkoutSessionUrl) && (
+                  <>
+                    <div className="border-t pt-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <ShieldCheck className="h-5 w-5 text-muted-foreground" />
+                        <p className="text-sm font-medium text-muted-foreground">
+                          Authorization Details
+                        </p>
+                      </div>
+                    </div>
+
+                    {payment.checkoutSessionStatus && (
+                      <div className="pl-7">
+                        <p className="text-sm text-muted-foreground">Authorization Status</p>
+                        <p className="font-medium">{payment.checkoutSessionStatus}</p>
+                      </div>
+                    )}
+
+                    {payment.stripeCheckoutSessionId && (
+                      <div className="pl-7">
+                        <p className="text-sm text-muted-foreground">Checkout Session</p>
+                        <p className="font-mono text-sm">{payment.stripeCheckoutSessionId}</p>
+                      </div>
+                    )}
+
+                    {payment.checkoutMode && (
+                      <div className="pl-7">
+                        <p className="text-sm text-muted-foreground">Checkout Mode</p>
+                        <p className="font-medium">{payment.checkoutMode.replace("_", " ")}</p>
+                      </div>
+                    )}
+
+                    {payment.sessionExpiresAt && (
+                      <div className="pl-7">
+                        <p className="text-sm text-muted-foreground">Session Expires</p>
+                        <p className="font-medium">{formatDate(payment.sessionExpiresAt)}</p>
+                      </div>
+                    )}
+
+                    {payment.checkoutSessionUrl && (
+                      <div className="pl-7">
+                        <p className="text-sm text-muted-foreground">Payment Link</p>
+                        <a
+                          href={payment.checkoutSessionUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium text-blue-600 dark:text-blue-400 hover:underline break-all"
+                        >
+                          Open checkout
+                        </a>
+                      </div>
+                    )}
+                  </>
+                )}
               </>
+            )}
+
+            {payment.notes && (
+              <div className="border-t pt-4">
+                <p className="text-sm text-muted-foreground">Notes</p>
+                <p className="text-sm whitespace-pre-wrap">{payment.notes}</p>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -267,6 +361,18 @@ export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
             <FileText className="h-5 w-5 text-green-600 dark:text-green-400" />
             Applied to Documents
           </CardTitle>
+          {remainingAmount > 0 && payment.status !== "VOID" && (
+            <CardAction>
+              <PaymentApplyDialog
+                paymentId={payment.id}
+                customerId={payment.customerId}
+                remainingAmount={remainingAmount}
+              />
+            </CardAction>
+          )}
+          <p className="text-sm text-muted-foreground">
+            Remaining to apply: {formatCurrency(remainingAmount)}
+          </p>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">

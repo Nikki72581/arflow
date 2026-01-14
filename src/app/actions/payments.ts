@@ -784,6 +784,248 @@ export async function getPaymentById(id: string) {
   return payment;
 }
 
+export async function getOpenDocumentsForPayment(customerId: string) {
+  const { userId } = await auth();
+  if (!userId) {
+    throw new Error("Unauthorized");
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { clerkId: userId },
+  });
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  const documents = await prisma.arDocument.findMany({
+    where: {
+      organizationId: user.organizationId,
+      customerId,
+      balanceDue: {
+        gt: 0,
+      },
+      status: {
+        not: "VOID",
+      },
+    },
+    select: {
+      id: true,
+      documentNumber: true,
+      documentType: true,
+      totalAmount: true,
+      balanceDue: true,
+      dueDate: true,
+    },
+    orderBy: {
+      dueDate: "asc",
+    },
+  });
+
+  return documents;
+}
+
+export async function applyPaymentToDocuments(data: {
+  paymentId: string;
+  applications: { documentId: string; amount: number }[];
+}) {
+  const { userId } = await auth();
+  if (!userId) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { clerkId: userId },
+  });
+
+  if (!user || user.role !== "ADMIN") {
+    return { success: false, error: "Only admins can apply payments" };
+  }
+
+  try {
+    const payment = await prisma.customerPayment.findFirst({
+      where: {
+        id: data.paymentId,
+        organizationId: user.organizationId,
+      },
+      include: {
+        paymentApplications: true,
+      },
+    });
+
+    if (!payment) {
+      return { success: false, error: "Payment not found" };
+    }
+
+    if (payment.status === "VOID") {
+      return { success: false, error: "Cannot apply a voided payment" };
+    }
+
+    if (!data.applications || data.applications.length === 0) {
+      return { success: false, error: "Select at least one document to apply" };
+    }
+
+    const alreadyApplied = payment.paymentApplications.reduce(
+      (sum, app) => sum + app.amountApplied,
+      0
+    );
+    const remainingAmount = payment.amount - alreadyApplied;
+
+    if (remainingAmount <= 0) {
+      return { success: false, error: "This payment is already fully applied" };
+    }
+
+    const totalToApply = data.applications.reduce(
+      (sum, app) => sum + app.amount,
+      0
+    );
+
+    if (totalToApply > remainingAmount) {
+      return {
+        success: false,
+        error: "Applied amount exceeds the remaining payment balance",
+      };
+    }
+
+    const documentIds = data.applications.map((app) => app.documentId);
+    const documents = await prisma.arDocument.findMany({
+      where: {
+        id: { in: documentIds },
+        organizationId: user.organizationId,
+        customerId: payment.customerId,
+      },
+    });
+
+    if (documents.length !== documentIds.length) {
+      return { success: false, error: "One or more documents not found" };
+    }
+
+    const documentMap = new Map(documents.map((doc) => [doc.id, doc]));
+
+    await prisma.$transaction(async (tx) => {
+      for (const application of data.applications) {
+        const document = documentMap.get(application.documentId);
+        if (!document) {
+          throw new Error("Document not found");
+        }
+
+        if (application.amount <= 0) {
+          throw new Error("Applied amount must be greater than zero");
+        }
+
+        if (application.amount > document.balanceDue) {
+          throw new Error("Applied amount exceeds document balance due");
+        }
+
+        await tx.paymentApplication.create({
+          data: {
+            organizationId: user.organizationId,
+            paymentId: payment.id,
+            arDocumentId: document.id,
+            amountApplied: application.amount,
+          },
+        });
+
+        const newBalance = document.balanceDue - application.amount;
+        const newAmountPaid = document.amountPaid + application.amount;
+
+        let newStatus = document.status;
+        if (newBalance === 0) {
+          newStatus = "PAID";
+        } else if (newAmountPaid > 0 && newBalance > 0) {
+          newStatus = "PARTIAL";
+        }
+
+        await tx.arDocument.update({
+          where: { id: document.id },
+          data: {
+            balanceDue: newBalance,
+            amountPaid: newAmountPaid,
+            status: newStatus,
+            paidDate: newBalance === 0 ? new Date() : null,
+          },
+        });
+      }
+
+      if (payment.status !== "APPLIED") {
+        await tx.customerPayment.update({
+          where: { id: payment.id },
+          data: {
+            status: "APPLIED",
+          },
+        });
+      }
+    });
+
+    revalidatePath(`/dashboard/payments/${payment.id}`);
+    revalidatePath("/dashboard/payments");
+    revalidatePath("/dashboard/documents");
+    revalidatePath(`/dashboard/clients/${payment.customerId}`);
+    documentIds.forEach((id) => revalidatePath(`/dashboard/documents/${id}`));
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error applying payment:", error);
+    return { success: false, error: error.message || "Failed to apply payment" };
+  }
+}
+
+export async function updatePaymentMethodInfo(data: {
+  paymentId: string;
+  paymentMethod: PaymentMethod;
+  referenceNumber?: string;
+}) {
+  const { userId } = await auth();
+  if (!userId) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { clerkId: userId },
+  });
+
+  if (!user || user.role !== "ADMIN") {
+    return { success: false, error: "Only admins can update payments" };
+  }
+
+  try {
+    const payment = await prisma.customerPayment.findFirst({
+      where: {
+        id: data.paymentId,
+        organizationId: user.organizationId,
+      },
+    });
+
+    if (!payment) {
+      return { success: false, error: "Payment not found" };
+    }
+
+    if (payment.status === "VOID") {
+      return { success: false, error: "Cannot update a voided payment" };
+    }
+
+    const shouldMarkApplied =
+      payment.status === "PENDING" && data.paymentMethod !== "CREDIT_CARD";
+
+    await prisma.customerPayment.update({
+      where: { id: payment.id },
+      data: {
+        paymentMethod: data.paymentMethod,
+        referenceNumber: data.referenceNumber || null,
+        status: shouldMarkApplied ? "APPLIED" : payment.status,
+      },
+    });
+
+    revalidatePath(`/dashboard/payments/${payment.id}`);
+    revalidatePath("/dashboard/payments");
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating payment:", error);
+    return { success: false, error: error.message || "Failed to update payment" };
+  }
+}
+
 export async function voidPayment(id: string, reason?: string) {
   const { userId } = await auth();
   if (!userId) {
