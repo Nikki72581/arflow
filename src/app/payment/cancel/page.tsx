@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { markSessionCancelled } from "@/app/actions/payments";
 
+export const dynamic = "force-dynamic";
+
 interface PageProps {
   searchParams: { session_id?: string };
 }

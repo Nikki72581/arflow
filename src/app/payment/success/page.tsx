@@ -8,6 +8,8 @@ import { verifyCheckoutSession } from "@/app/actions/payments";
 import { formatCurrency } from "@/lib/utils";
 import { PaymentProcessingRefresh } from "@/components/payments/payment-processing-refresh";
 
+export const dynamic = "force-dynamic";
+
 interface PageProps {
   searchParams: { session_id?: string };
 }
