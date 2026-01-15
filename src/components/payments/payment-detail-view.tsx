@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/components/ui/card";
@@ -25,17 +27,24 @@ import {
   Phone,
   ShieldCheck,
   ExternalLink,
+  RefreshCw,
 } from "lucide-react";
 import { VoidPaymentDialog } from "./void-payment-dialog";
 import { PaymentExportButton } from "./payment-export-button";
 import { PaymentApplyDialog } from "./payment-apply-dialog";
 import { PaymentCheckInfoDialog } from "./payment-check-info-dialog";
+import { requeryStripePayment } from "@/app/actions/payments";
+import { useAppToast } from "@/hooks/use-app-toast";
 
 interface PaymentDetailViewProps {
   payment: any;
 }
 
 export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
+  const router = useRouter();
+  const toast = useAppToast();
+  const [requerying, setRequerying] = useState(false);
+
   const getStatusVariant = (status: string) => {
     switch (status) {
       case "APPLIED":
@@ -72,6 +81,26 @@ export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
   );
   const remainingAmount = Math.max(payment.amount - totalApplied, 0);
 
+  const canRequeryStripe =
+    payment.paymentGatewayProvider === "STRIPE" && payment.stripeCheckoutSessionId;
+
+  const handleRequeryStripe = async () => {
+    setRequerying(true);
+    try {
+      const result = await requeryStripePayment(payment.id);
+      if (!result.success) {
+        toast.error("Stripe requery failed", result.error);
+        return;
+      }
+      toast.success("Stripe requery complete", `Status: ${result.status}`);
+      router.refresh();
+    } catch (error: any) {
+      toast.error("Stripe requery failed", error?.message || "Please try again.");
+    } finally {
+      setRequerying(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -96,6 +125,17 @@ export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
         </div>
         <div className="flex gap-2">
           <PaymentExportButton payments={[payment]} variant="detail" />
+          {canRequeryStripe && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleRequeryStripe}
+              disabled={requerying}
+            >
+              <RefreshCw className={requerying ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} />
+              {requerying ? "Requerying..." : "Requery Stripe"}
+            </Button>
+          )}
           {payment.status === "PENDING" && payment.checkoutSessionUrl && (
             <Button size="sm" variant="outline" asChild>
               <a

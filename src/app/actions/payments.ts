@@ -7,6 +7,10 @@ import { PaymentMethod, PaymentGatewayProvider, PaymentStatus } from "@prisma/cl
 import { getDecryptedCredentials } from "./authorize-net";
 import { getDecryptedStripeCredentials } from "./stripe";
 import { processStripePayment } from "@/lib/payment-gateway/stripe/client";
+import {
+  handleCheckoutSessionCompleted,
+  handleCheckoutSessionExpired,
+} from "@/lib/payment-gateway/stripe/webhook-handlers";
 
 interface PaymentData {
   customerId: string;
@@ -730,6 +734,87 @@ export async function markSessionCancelled(sessionId: string) {
   } catch (error: any) {
     console.error("Error marking session as cancelled:", error);
     return { success: false, error: error.message || "Failed to update session" };
+  }
+}
+
+export async function requeryStripePayment(id: string) {
+  const { userId } = await auth();
+  if (!userId) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { clerkId: userId },
+  });
+
+  if (!user || user.role !== "ADMIN") {
+    return { success: false, error: "Only admins can requery payments" };
+  }
+
+  try {
+    const payment = await prisma.customerPayment.findFirst({
+      where: {
+        id,
+        organizationId: user.organizationId,
+      },
+    });
+
+    if (!payment) {
+      return { success: false, error: "Payment not found" };
+    }
+
+    if (payment.paymentGatewayProvider !== "STRIPE") {
+      return { success: false, error: "Only Stripe payments can be requeried" };
+    }
+
+    if (!payment.stripeCheckoutSessionId) {
+      return { success: false, error: "No Stripe session found for this payment" };
+    }
+
+    const credentials = await getDecryptedStripeCredentials(user.organizationId);
+    if (!credentials) {
+      return { success: false, error: "Stripe is not configured" };
+    }
+
+    const { retrieveCheckoutSession } = await import(
+      "@/lib/payment-gateway/stripe/checkout"
+    );
+
+    const session = await retrieveCheckoutSession(
+      credentials,
+      payment.stripeCheckoutSessionId
+    );
+
+    if (!session) {
+      return { success: false, error: "Unable to retrieve Stripe session" };
+    }
+
+    const sessionStatus = session.status || "open";
+
+    if (sessionStatus === "complete") {
+      await handleCheckoutSessionCompleted(session);
+    } else if (sessionStatus === "expired") {
+      await handleCheckoutSessionExpired(session);
+    } else {
+      await prisma.customerPayment.update({
+        where: { id: payment.id },
+        data: {
+          checkoutSessionStatus: sessionStatus,
+          sessionExpiresAt: session.expires_at
+            ? new Date(session.expires_at * 1000)
+            : payment.sessionExpiresAt,
+          gatewayResponse: JSON.parse(JSON.stringify(session)),
+        },
+      });
+    }
+
+    revalidatePath(`/dashboard/payments/${payment.id}`);
+    revalidatePath("/dashboard/payments");
+
+    return { success: true, status: sessionStatus };
+  } catch (error: any) {
+    console.error("Error requerying Stripe payment:", error);
+    return { success: false, error: error.message || "Failed to requery Stripe" };
   }
 }
 
