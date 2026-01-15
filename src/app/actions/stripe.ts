@@ -55,6 +55,13 @@ async function createStripeWebhook(
   isProduction: boolean
 ): Promise<{ success: boolean; webhookSecret?: string; webhookEndpointId?: string; error?: string }> {
   try {
+    const desiredEvents: Stripe.WebhookEndpointUpdateParams.EnabledEvent[] = [
+      "checkout.session.completed",
+      "checkout.session.expired",
+      "payment_intent.succeeded",
+      "payment_intent.payment_failed",
+    ];
+
     // Get the app URL from environment
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
 
@@ -84,20 +91,18 @@ async function createStripeWebhook(
     );
 
     if (existingWebhook) {
-      const desiredEvents = [
-        "checkout.session.completed",
-        "checkout.session.expired",
-        "payment_intent.succeeded",
-        "payment_intent.payment_failed",
-      ];
-      const currentEvents = existingWebhook.enabled_events || [];
+      const currentEvents =
+        (existingWebhook.enabled_events ||
+          []) as Stripe.WebhookEndpointUpdateParams.EnabledEvent[];
       const missingEvents = desiredEvents.filter(
         (eventName) => !currentEvents.includes(eventName)
       );
 
       if (missingEvents.length > 0) {
         await stripe.webhookEndpoints.update(existingWebhook.id, {
-          enabled_events: Array.from(new Set([...currentEvents, ...desiredEvents])),
+          enabled_events: Array.from(
+            new Set([...currentEvents, ...desiredEvents])
+          ) as Stripe.WebhookEndpointUpdateParams.EnabledEvent[],
         });
       }
 
@@ -114,10 +119,7 @@ async function createStripeWebhook(
     const webhook = await stripe.webhookEndpoints.create({
       url: webhookUrl,
       enabled_events: [
-        "checkout.session.completed",
-        "checkout.session.expired",
-        "payment_intent.succeeded",
-        "payment_intent.payment_failed",
+        ...desiredEvents,
       ],
       description: `ARFlow ${isProduction ? "Production" : "Test"} Webhook`,
     });
