@@ -54,6 +54,7 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
   // Embedded checkout state
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [publishableKey, setPublishableKey] = useState<string | null>(null);
+  const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
 
   // Other payment methods state
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("CHECK");
@@ -113,12 +114,14 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
         // Show embedded checkout
         if (result.clientSecret) {
           setClientSecret(result.clientSecret);
+          setCheckoutSessionId(result.sessionId || null);
         } else {
           throw new Error("No client secret returned from checkout session");
         }
       } else {
         // Show generated link
         setGeneratedLink(result.sessionUrl!);
+        setCheckoutSessionId(result.sessionId || null);
       }
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred");
@@ -180,6 +183,7 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
       setClientSecret(null);
       setGeneratedLink(null);
       setError(null);
+      setCheckoutSessionId(null);
     }
   };
 
@@ -300,8 +304,11 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
                         clientSecret={clientSecret}
                         publishableKey={publishableKey}
                         onComplete={() => {
-                          // Payment completed - Stripe will redirect to success page
-                          // No need to close dialog, the page will navigate
+                          if (checkoutSessionId) {
+                            router.push(
+                              `/payment/success?session_id=${checkoutSessionId}`
+                            );
+                          }
                         }}
                       />
                     </div>
