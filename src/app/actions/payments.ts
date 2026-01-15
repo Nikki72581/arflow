@@ -589,11 +589,10 @@ export async function getPayments({
   };
 }
 
-export async function createStripeCheckoutSession(data: {
+export async function createStripePaymentIntent(data: {
   customerId: string;
   amount: number;
   documentIds: string[];
-  mode: "pay_now" | "generate_link";
 }) {
   const { userId } = await auth();
   if (!userId) {
@@ -618,43 +617,33 @@ export async function createStripeCheckoutSession(data: {
       };
     }
 
-    // Import checkout module
-    const { createCheckoutSession } = await import("@/lib/payment-gateway/stripe/checkout");
+    const { createPaymentIntent } = await import(
+      "@/lib/payment-gateway/stripe/payment-intent"
+    );
 
-    // Create checkout session
-    const result = await createCheckoutSession(credentials, {
+    const result = await createPaymentIntent(credentials, {
       organizationId: user.organizationId,
       customerId: data.customerId,
       documentIds: data.documentIds,
       amount: data.amount,
-      mode: data.mode,
     });
 
     if (!result.success) {
       return {
         success: false,
-        error: result.error || "Failed to create checkout session",
+        error: result.error || "Failed to create payment intent",
       };
     }
 
-    // Return appropriate response based on mode
-    if (data.mode === "pay_now") {
-      // For embedded mode, return client secret instead of URL
-      return {
-        success: true,
-        clientSecret: result.clientSecret, // For embedded checkout
-        sessionId: result.sessionId,
-      };
-    } else {
-      return {
-        success: true,
-        sessionUrl: result.sessionUrl, // Client will display this URL
-        sessionId: result.sessionId,
-      };
-    }
+    return {
+      success: true,
+      clientSecret: result.clientSecret,
+      paymentIntentId: result.paymentIntentId,
+      paymentId: result.paymentId,
+    };
   } catch (error: any) {
-    console.error("Error creating Stripe checkout session:", error);
-    return { success: false, error: error.message || "Failed to create checkout session" };
+    console.error("Error creating Stripe payment intent:", error);
+    return { success: false, error: error.message || "Failed to create payment intent" };
   }
 }
 
@@ -716,6 +705,60 @@ export async function verifyCheckoutSession(sessionId: string) {
   }
 }
 
+export async function verifyStripePayment(paymentIntentId: string) {
+  try {
+    const payment = await prisma.customerPayment.findFirst({
+      where: { gatewayTransactionId: paymentIntentId },
+      include: {
+        customer: true,
+        paymentApplications: {
+          include: {
+            arDocument: true,
+          },
+        },
+      },
+    });
+
+    if (!payment) {
+      return { success: false, error: "Payment not found" };
+    }
+
+    if (payment.status === "PENDING") {
+      return {
+        success: false,
+        pending: true,
+        error: "Payment is still processing. Please wait a moment and refresh.",
+      };
+    }
+
+    if (payment.status !== "APPLIED") {
+      return {
+        success: false,
+        error: "Payment is not complete",
+      };
+    }
+
+    return {
+      success: true,
+      paymentNumber: payment.paymentNumber,
+      amount: payment.amount,
+      transactionId: payment.gatewayTransactionId,
+      customerId: payment.customerId,
+      customerName: payment.customer.companyName,
+      paymentDate: payment.paymentDate,
+      documents: payment.paymentApplications.map((app) => ({
+        id: app.arDocument.id,
+        documentNumber: app.arDocument.documentNumber,
+        documentType: app.arDocument.documentType,
+        amountApplied: app.amountApplied,
+      })),
+    };
+  } catch (error: any) {
+    console.error("Error verifying Stripe payment:", error);
+    return { success: false, error: error.message || "Failed to verify payment" };
+  }
+}
+
 export async function markSessionCancelled(sessionId: string) {
   try {
     // Update payment to VOID status if still PENDING
@@ -763,53 +806,99 @@ export async function requeryStripePayment(id: string) {
       return { success: false, error: "Payment not found" };
     }
 
-    if (payment.paymentGatewayProvider !== "STRIPE") {
-      return { success: false, error: "Only Stripe payments can be requeried" };
-    }
+  if (payment.paymentGatewayProvider !== "STRIPE") {
+    return { success: false, error: "Only Stripe payments can be requeried" };
+  }
 
-    if (!payment.stripeCheckoutSessionId) {
-      return { success: false, error: "No Stripe session found for this payment" };
-    }
+  if (!payment.gatewayTransactionId && !payment.stripeCheckoutSessionId) {
+    return { success: false, error: "No Stripe payment found for this record" };
+  }
 
-    const credentials = await getDecryptedStripeCredentials(user.organizationId);
-    if (!credentials) {
-      return { success: false, error: "Stripe is not configured" };
-    }
+  const credentials = await getDecryptedStripeCredentials(user.organizationId);
+  if (!credentials) {
+    return { success: false, error: "Stripe is not configured" };
+  }
 
-    const { retrieveCheckoutSession } = await import(
-      "@/lib/payment-gateway/stripe/checkout"
+  if (payment.gatewayTransactionId) {
+    const { retrievePaymentIntent } = await import(
+      "@/lib/payment-gateway/stripe/payment-intent"
+    );
+    const { handlePaymentIntentFailed, handlePaymentIntentSucceeded } = await import(
+      "@/lib/payment-gateway/stripe/webhook-handlers"
     );
 
-    const session = await retrieveCheckoutSession(
+    const paymentIntent = await retrievePaymentIntent(
       credentials,
-      payment.stripeCheckoutSessionId
+      payment.gatewayTransactionId
     );
 
-    if (!session) {
-      return { success: false, error: "Unable to retrieve Stripe session" };
+    if (!paymentIntent) {
+      return { success: false, error: "Unable to retrieve Stripe payment intent" };
     }
 
-    const sessionStatus = session.status || "open";
-
-    if (sessionStatus === "complete") {
-      await handleCheckoutSessionCompleted(session);
-    } else if (sessionStatus === "expired") {
-      await handleCheckoutSessionExpired(session);
+    if (paymentIntent.status === "succeeded") {
+      await handlePaymentIntentSucceeded(paymentIntent);
+    } else if (paymentIntent.status === "canceled") {
+      await prisma.customerPayment.update({
+        where: { id: payment.id },
+        data: {
+          status: "VOID",
+          checkoutSessionStatus: paymentIntent.status,
+          gatewayResponse: JSON.parse(JSON.stringify(paymentIntent)),
+        },
+      });
+    } else if (paymentIntent.status === "requires_payment_method") {
+      await handlePaymentIntentFailed(paymentIntent);
     } else {
       await prisma.customerPayment.update({
         where: { id: payment.id },
         data: {
-          checkoutSessionStatus: sessionStatus,
-          sessionExpiresAt: session.expires_at
-            ? new Date(session.expires_at * 1000)
-            : payment.sessionExpiresAt,
-          gatewayResponse: JSON.parse(JSON.stringify(session)),
+          checkoutSessionStatus: paymentIntent.status,
+          gatewayResponse: JSON.parse(JSON.stringify(paymentIntent)),
         },
       });
     }
 
     revalidatePath(`/dashboard/payments/${payment.id}`);
     revalidatePath("/dashboard/payments");
+
+    return { success: true, status: paymentIntent.status };
+  }
+
+  const { retrieveCheckoutSession } = await import(
+    "@/lib/payment-gateway/stripe/checkout"
+  );
+
+  const session = await retrieveCheckoutSession(
+    credentials,
+    payment.stripeCheckoutSessionId as string
+  );
+
+  if (!session) {
+    return { success: false, error: "Unable to retrieve Stripe session" };
+  }
+
+  const sessionStatus = session.status || "open";
+
+  if (sessionStatus === "complete") {
+    await handleCheckoutSessionCompleted(session);
+  } else if (sessionStatus === "expired") {
+    await handleCheckoutSessionExpired(session);
+  } else {
+    await prisma.customerPayment.update({
+      where: { id: payment.id },
+      data: {
+        checkoutSessionStatus: sessionStatus,
+        sessionExpiresAt: session.expires_at
+          ? new Date(session.expires_at * 1000)
+          : payment.sessionExpiresAt,
+        gatewayResponse: JSON.parse(JSON.stringify(session)),
+      },
+    });
+  }
+
+  revalidatePath(`/dashboard/payments/${payment.id}`);
+  revalidatePath("/dashboard/payments");
 
     return { success: true, status: sessionStatus };
   } catch (error: any) {

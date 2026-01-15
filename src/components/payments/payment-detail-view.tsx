@@ -26,7 +26,6 @@ import {
   Mail,
   Phone,
   ShieldCheck,
-  ExternalLink,
   RefreshCw,
 } from "lucide-react";
 import { VoidPaymentDialog } from "./void-payment-dialog";
@@ -82,7 +81,8 @@ export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
   const remainingAmount = Math.max(payment.amount - totalApplied, 0);
 
   const canRequeryStripe =
-    payment.paymentGatewayProvider === "STRIPE" && payment.stripeCheckoutSessionId;
+    payment.paymentGatewayProvider === "STRIPE" &&
+    (payment.gatewayTransactionId || payment.stripeCheckoutSessionId);
 
   const handleRequeryStripe = async () => {
     setRequerying(true);
@@ -134,18 +134,6 @@ export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
             >
               <RefreshCw className={requerying ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} />
               {requerying ? "Requerying..." : "Requery Stripe"}
-            </Button>
-          )}
-          {payment.status === "PENDING" && payment.checkoutSessionUrl && (
-            <Button size="sm" variant="outline" asChild>
-              <a
-                href={payment.checkoutSessionUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <ExternalLink className="mr-2 h-4 w-4" />
-                Run Charge
-              </a>
             </Button>
           )}
           {payment.status !== "VOID" && (
@@ -263,9 +251,8 @@ export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
 
                 {(payment.checkoutSessionStatus ||
                   payment.stripeCheckoutSessionId ||
-                  payment.checkoutMode ||
-                  payment.sessionExpiresAt ||
-                  payment.checkoutSessionUrl) && (
+                  payment.gatewayTransactionId ||
+                  payment.sessionExpiresAt) && (
                   <>
                     <div className="border-t pt-4">
                       <div className="flex items-center gap-2 mb-3">
@@ -278,8 +265,15 @@ export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
 
                     {payment.checkoutSessionStatus && (
                       <div className="pl-7">
-                        <p className="text-sm text-muted-foreground">Authorization Status</p>
+                        <p className="text-sm text-muted-foreground">Payment Status</p>
                         <p className="font-medium">{payment.checkoutSessionStatus}</p>
+                      </div>
+                    )}
+
+                    {payment.gatewayTransactionId && (
+                      <div className="pl-7">
+                        <p className="text-sm text-muted-foreground">Payment Intent</p>
+                        <p className="font-mono text-sm">{payment.gatewayTransactionId}</p>
                       </div>
                     )}
 
@@ -290,31 +284,10 @@ export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
                       </div>
                     )}
 
-                    {payment.checkoutMode && (
-                      <div className="pl-7">
-                        <p className="text-sm text-muted-foreground">Checkout Mode</p>
-                        <p className="font-medium">{payment.checkoutMode.replace("_", " ")}</p>
-                      </div>
-                    )}
-
                     {payment.sessionExpiresAt && (
                       <div className="pl-7">
                         <p className="text-sm text-muted-foreground">Session Expires</p>
                         <p className="font-medium">{formatDate(payment.sessionExpiresAt)}</p>
-                      </div>
-                    )}
-
-                    {payment.checkoutSessionUrl && (
-                      <div className="pl-7">
-                        <p className="text-sm text-muted-foreground">Payment Link</p>
-                        <a
-                          href={payment.checkoutSessionUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="font-medium text-blue-600 dark:text-blue-400 hover:underline break-all"
-                        >
-                          Open checkout
-                        </a>
                       </div>
                     )}
                   </>

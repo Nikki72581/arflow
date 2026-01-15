@@ -174,16 +174,11 @@ export async function handlePaymentIntentFailed(
   console.log('Processing payment_intent.payment_failed:', paymentIntentId);
 
   try {
-    // Build search criteria - only add checkoutSessionId if it exists
-    const whereConditions: any[] = [
+    // Build search criteria - use gateway transaction ID or metadata
+    const whereConditions = [
       { gatewayTransactionId: paymentIntentId },
-    ];
-
-    if (paymentIntent.metadata?.checkoutSessionId) {
-      whereConditions.push({
-        stripeCheckoutSessionId: paymentIntent.metadata.checkoutSessionId,
-      });
-    }
+      paymentIntent.metadata?.paymentId ? { id: paymentIntent.metadata.paymentId } : null,
+    ].filter(Boolean) as any[];
 
     // Find payment by gateway transaction ID or checkout session
     const payment = await prisma.customerPayment.findFirst({
@@ -216,6 +211,121 @@ export async function handlePaymentIntentFailed(
     console.log('Payment intent failed, payment voided:', payment.id);
   } catch (error) {
     console.error('Error processing payment intent failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Handle payment intent success
+ * This is called when a Payment Element payment succeeds
+ */
+export async function handlePaymentIntentSucceeded(
+  paymentIntent: Stripe.PaymentIntent
+) {
+  const paymentIntentId = paymentIntent.id;
+
+  console.log('Processing payment_intent.succeeded:', paymentIntentId);
+
+  if (!paymentIntent.metadata?.documentIds) {
+    console.error('Missing metadata or documentIds for payment intent:', paymentIntentId);
+    return;
+  }
+
+  const payment = await prisma.customerPayment.findFirst({
+    where: {
+      OR: [
+        { gatewayTransactionId: paymentIntentId },
+        paymentIntent.metadata?.paymentId ? { id: paymentIntent.metadata.paymentId } : null,
+      ].filter(Boolean) as any[],
+    },
+  });
+
+  if (!payment) {
+    console.error('Payment not found for intent:', paymentIntentId);
+    return;
+  }
+
+  if (payment.status === 'APPLIED' && payment.gatewayTransactionId) {
+    console.log('Payment already processed (idempotent):', payment.id);
+    return;
+  }
+
+  try {
+    const documentIds = paymentIntent.metadata.documentIds
+      .split(',')
+      .filter((id) => id.trim());
+
+    if (documentIds.length === 0) {
+      throw new Error('No valid document IDs found in metadata');
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.customerPayment.update({
+        where: { id: payment.id },
+        data: {
+          status: 'APPLIED',
+          checkoutSessionStatus: paymentIntent.status,
+          gatewayTransactionId: paymentIntentId,
+          gatewayResponse: JSON.parse(JSON.stringify(paymentIntent)),
+        },
+      });
+
+      let remainingAmount = payment.amount;
+
+      for (const documentId of documentIds) {
+        if (remainingAmount <= 0) break;
+
+        const document = await tx.arDocument.findUnique({
+          where: { id: documentId },
+        });
+
+        if (!document) {
+          console.warn('Document not found:', documentId);
+          continue;
+        }
+
+        const amountToApply = Math.min(remainingAmount, document.balanceDue);
+
+        if (amountToApply <= 0) {
+          continue;
+        }
+
+        await tx.paymentApplication.create({
+          data: {
+            organizationId: payment.organizationId,
+            paymentId: payment.id,
+            arDocumentId: documentId,
+            amountApplied: amountToApply,
+          },
+        });
+
+        const newBalance = document.balanceDue - amountToApply;
+        const newAmountPaid = document.amountPaid + amountToApply;
+
+        let newStatus = document.status;
+        if (newBalance === 0) {
+          newStatus = 'PAID';
+        } else if (newAmountPaid > 0) {
+          newStatus = 'PARTIAL';
+        }
+
+        await tx.arDocument.update({
+          where: { id: documentId },
+          data: {
+            balanceDue: newBalance,
+            amountPaid: newAmountPaid,
+            status: newStatus,
+            ...(newBalance === 0 && { paidDate: new Date() }),
+          },
+        });
+
+        remainingAmount -= amountToApply;
+      }
+    });
+
+    console.log('Payment intent succeeded:', paymentIntentId);
+  } catch (error) {
+    console.error('Error processing payment intent succeeded:', error);
     throw error;
   }
 }

@@ -84,6 +84,23 @@ async function createStripeWebhook(
     );
 
     if (existingWebhook) {
+      const desiredEvents = [
+        "checkout.session.completed",
+        "checkout.session.expired",
+        "payment_intent.succeeded",
+        "payment_intent.payment_failed",
+      ];
+      const currentEvents = existingWebhook.enabled_events || [];
+      const missingEvents = desiredEvents.filter(
+        (eventName) => !currentEvents.includes(eventName)
+      );
+
+      if (missingEvents.length > 0) {
+        await stripe.webhookEndpoints.update(existingWebhook.id, {
+          enabled_events: Array.from(new Set([...currentEvents, ...desiredEvents])),
+        });
+      }
+
       // Webhook already exists, return its secret
       console.log("Webhook endpoint already exists:", existingWebhook.id);
       return {
@@ -99,6 +116,7 @@ async function createStripeWebhook(
       enabled_events: [
         "checkout.session.completed",
         "checkout.session.expired",
+        "payment_intent.succeeded",
         "payment_intent.payment_failed",
       ],
       description: `ARFlow ${isProduction ? "Production" : "Test"} Webhook`,

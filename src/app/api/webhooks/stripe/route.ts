@@ -7,6 +7,7 @@ import {
   handleCheckoutSessionCompleted,
   handleCheckoutSessionExpired,
   handlePaymentIntentFailed,
+  handlePaymentIntentSucceeded,
 } from '@/lib/payment-gateway/stripe/webhook-handlers';
 
 /**
@@ -16,7 +17,7 @@ import {
  * IMPORTANT: This endpoint must be configured in your Stripe Dashboard:
  * Dashboard → Developers → Webhooks → Add endpoint
  * URL: https://yourdomain.com/api/webhooks/stripe
- * Events: checkout.session.completed, checkout.session.expired, payment_intent.payment_failed
+ * Events: checkout.session.completed, checkout.session.expired, payment_intent.succeeded, payment_intent.payment_failed
  */
 export async function POST(req: Request) {
   const body = await req.text();
@@ -40,38 +41,61 @@ export async function POST(req: Request) {
     const eventData = JSON.parse(body);
     const eventObject = eventData.data?.object;
 
-    // Determine session ID from different event types
-    let sessionId: string | undefined;
-    if (eventData.type.startsWith('checkout.session')) {
-      sessionId = eventObject?.id;
-    } else if (eventData.type.startsWith('payment_intent')) {
-      // For payment intent events, we may need to look up via payment intent ID
-      // or use metadata if available
-      sessionId = eventObject?.metadata?.checkoutSessionId;
-    }
+    const eventType = eventData.type;
 
-    if (!sessionId) {
-      console.error('Could not determine session ID from event:', eventData.type);
-      return NextResponse.json(
-        { error: 'Could not determine session ID' },
-        { status: 400 }
-      );
-    }
+    let payment: any = null;
 
-    // Find payment to get organization and webhook secret
-    const payment = await prisma.customerPayment.findFirst({
-      where: { stripeCheckoutSessionId: sessionId },
-      include: {
-        organization: {
-          include: {
-            stripeIntegration: true,
+    if (eventType.startsWith('checkout.session')) {
+      const sessionId = eventObject?.id;
+      if (!sessionId) {
+        console.error('Could not determine session ID from event:', eventType);
+        return NextResponse.json(
+          { error: 'Could not determine session ID' },
+          { status: 400 }
+        );
+      }
+
+      payment = await prisma.customerPayment.findFirst({
+        where: { stripeCheckoutSessionId: sessionId },
+        include: {
+          organization: {
+            include: {
+              stripeIntegration: true,
+            },
           },
         },
-      },
-    });
+      });
+    } else if (eventType.startsWith('payment_intent')) {
+      const paymentIntentId = eventObject?.id;
+      const paymentId = eventObject?.metadata?.paymentId;
+
+      if (!paymentIntentId && !paymentId) {
+        console.error('Could not determine payment intent ID from event:', eventType);
+        return NextResponse.json(
+          { error: 'Could not determine payment intent ID' },
+          { status: 400 }
+        );
+      }
+
+      payment = await prisma.customerPayment.findFirst({
+        where: {
+          OR: [
+            paymentIntentId ? { gatewayTransactionId: paymentIntentId } : undefined,
+            paymentId ? { id: paymentId } : undefined,
+          ].filter(Boolean) as any,
+        },
+        include: {
+          organization: {
+            include: {
+              stripeIntegration: true,
+            },
+          },
+        },
+      });
+    }
 
     if (!payment || !payment.organization.stripeIntegration) {
-      console.error('Payment or Stripe integration not found for session:', sessionId);
+      console.error('Payment or Stripe integration not found for event:', eventType);
       return NextResponse.json(
         { error: 'Payment configuration not found' },
         { status: 404 }
@@ -122,6 +146,10 @@ export async function POST(req: Request) {
 
       case 'checkout.session.expired':
         await handleCheckoutSessionExpired(event.data.object as Stripe.Checkout.Session);
+        break;
+
+      case 'payment_intent.succeeded':
+        await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent);
         break;
 
       case 'payment_intent.payment_failed':

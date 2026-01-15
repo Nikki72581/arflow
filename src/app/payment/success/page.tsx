@@ -4,18 +4,26 @@ import { CheckCircle2, ArrowLeft, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { verifyCheckoutSession } from "@/app/actions/payments";
+import { verifyCheckoutSession, verifyStripePayment } from "@/app/actions/payments";
 import { formatCurrency } from "@/lib/utils";
 import { PaymentProcessingRefresh } from "@/components/payments/payment-processing-refresh";
 
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  searchParams: { session_id?: string };
+  searchParams: { session_id?: string; payment_intent?: string };
 }
 
-async function PaymentSuccessContent({ sessionId }: { sessionId: string }) {
-  const result = await verifyCheckoutSession(sessionId);
+async function PaymentSuccessContent({
+  sessionId,
+  paymentIntentId,
+}: {
+  sessionId?: string;
+  paymentIntentId?: string;
+}) {
+  const result = paymentIntentId
+    ? await verifyStripePayment(paymentIntentId)
+    : await verifyCheckoutSession(sessionId as string);
 
   if (!result.success) {
     if (result.pending) {
@@ -153,13 +161,14 @@ async function PaymentSuccessContent({ sessionId }: { sessionId: string }) {
 
 export default function PaymentSuccessPage({ searchParams }: PageProps) {
   const sessionId = searchParams.session_id;
+  const paymentIntentId = searchParams.payment_intent;
 
-  if (!sessionId) {
+  if (!sessionId && !paymentIntentId) {
     return (
       <div className="max-w-2xl mx-auto py-12 px-4">
         <Alert variant="destructive">
           <AlertDescription>
-            No session ID provided. Please check your payment link.
+            No payment reference provided. Please check your payment link.
           </AlertDescription>
         </Alert>
         <div className="mt-6 text-center">
@@ -185,7 +194,7 @@ export default function PaymentSuccessPage({ searchParams }: PageProps) {
         </div>
       }
     >
-      <PaymentSuccessContent sessionId={sessionId} />
+      <PaymentSuccessContent sessionId={sessionId} paymentIntentId={paymentIntentId} />
     </Suspense>
   );
 }

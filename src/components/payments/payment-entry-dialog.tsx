@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { CreditCard, DollarSign, CheckCircle2, Lock, AlertCircle, Copy } from "lucide-react";
+import { CreditCard, DollarSign, CheckCircle2, Lock, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,14 +22,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { createManualPayment, createStripeCheckoutSession } from "@/app/actions/payments";
+import { createManualPayment, createStripePaymentIntent } from "@/app/actions/payments";
 import { getActiveProvider } from "@/app/actions/payment-gateway-settings";
 import { getStripePublishableKey } from "@/app/actions/stripe";
 import { formatCurrency } from "@/lib/utils";
 import { PaymentMethod } from "@prisma/client";
-import { StripeEmbeddedCheckout } from "./stripe-embedded-checkout";
+import { StripePaymentElement } from "./stripe-payment-element";
 
 interface PaymentEntryDialogProps {
   document: any;
@@ -46,15 +45,9 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
   const [gatewayEnabled, setGatewayEnabled] = useState(false);
   const [amount, setAmount] = useState(document.balanceDue.toString());
 
-  // Stripe Checkout mode state
-  const [checkoutMode, setCheckoutMode] = useState<"pay_now" | "generate_link">("pay_now");
-  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
-  const [copySuccess, setCopySuccess] = useState(false);
-
-  // Embedded checkout state
+  // Stripe Payment Element state
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [publishableKey, setPublishableKey] = useState<string | null>(null);
-  const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
 
   // Other payment methods state
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("CHECK");
@@ -78,14 +71,7 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
     }
   }, [open]);
 
-  // Copy to clipboard helper
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopySuccess(true);
-    setTimeout(() => setCopySuccess(false), 2000);
-  };
-
-  // Handle Stripe Checkout submission
+  // Handle Stripe Payment Element setup
   async function handleCheckoutSubmit() {
     setLoading(true);
     setError(null);
@@ -99,29 +85,20 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
         );
       }
 
-      const result = await createStripeCheckoutSession({
+      const result = await createStripePaymentIntent({
         customerId: document.customerId,
         amount: paymentAmount,
         documentIds: [document.id],
-        mode: checkoutMode,
       });
 
       if (!result.success) {
-        throw new Error(result.error || "Failed to create checkout session");
+        throw new Error(result.error || "Failed to create payment intent");
       }
 
-      if (checkoutMode === "pay_now") {
-        // Show embedded checkout
-        if (result.clientSecret) {
-          setClientSecret(result.clientSecret);
-          setCheckoutSessionId(result.sessionId || null);
-        } else {
-          throw new Error("No client secret returned from checkout session");
-        }
+      if (result.clientSecret) {
+        setClientSecret(result.clientSecret);
       } else {
-        // Show generated link
-        setGeneratedLink(result.sessionUrl!);
-        setCheckoutSessionId(result.sessionId || null);
+        throw new Error("No client secret returned from payment intent");
       }
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred");
@@ -179,11 +156,9 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);
     if (!isOpen) {
-      // Reset embedded checkout state
+      // Reset payment element state
       setClientSecret(null);
-      setGeneratedLink(null);
       setError(null);
-      setCheckoutSessionId(null);
     }
   };
 
@@ -199,7 +174,7 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
           </Button>
         </DialogTrigger>
       )}
-      <DialogContent className={clientSecret ? "sm:max-w-[800px]" : "sm:max-w-[600px]"}>
+      <DialogContent className={clientSecret ? "sm:max-w-[720px]" : "sm:max-w-[600px]"}>
         {showSuccess ? (
           <div className="flex flex-col items-center justify-center py-12">
             <div className="animate-in zoom-in duration-500">
@@ -282,7 +257,7 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
                     </Alert>
                   )}
 
-                  {/* Show Embedded Checkout when client secret is available */}
+                  {/* Show Payment Element when client secret is available */}
                   {gatewayEnabled && clientSecret && publishableKey && (
                     <div className="space-y-4">
                       <div className="flex items-center justify-between pb-4 border-b">
@@ -300,51 +275,24 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
                           Back
                         </Button>
                       </div>
-                      <StripeEmbeddedCheckout
+                      <StripePaymentElement
                         clientSecret={clientSecret}
                         publishableKey={publishableKey}
-                        onComplete={() => {
-                          if (checkoutSessionId) {
-                            router.push(
-                              `/payment/success?session_id=${checkoutSessionId}`
-                            );
-                          }
+                        amount={parseFloat(amount)}
+                        onSuccess={() => {
+                          setShowSuccess(true);
+                          setTimeout(() => {
+                            setShowSuccess(false);
+                            setOpen(false);
+                            router.refresh();
+                          }, 2000);
                         }}
                       />
                     </div>
                   )}
 
-                  {gatewayEnabled && !generatedLink && !clientSecret && (
+                  {gatewayEnabled && !clientSecret && (
                     <>
-                      {/* Payment Mode Selection */}
-                      <div className="space-y-4">
-                        <Label className="text-base font-semibold">Select Payment Method</Label>
-                        <RadioGroup value={checkoutMode} onValueChange={(v) => setCheckoutMode(v as "pay_now" | "generate_link")}>
-                          <div className="flex items-start space-x-3 p-4 border rounded-lg hover:bg-accent transition-colors cursor-pointer">
-                            <RadioGroupItem value="pay_now" id="pay_now" className="mt-1" />
-                            <div className="flex-1">
-                              <Label htmlFor="pay_now" className="cursor-pointer font-semibold">
-                                Pay Now
-                              </Label>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                Complete payment immediately using Stripe's secure embedded checkout
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-start space-x-3 p-4 border rounded-lg hover:bg-accent transition-colors cursor-pointer">
-                            <RadioGroupItem value="generate_link" id="generate_link" className="mt-1" />
-                            <div className="flex-1">
-                              <Label htmlFor="generate_link" className="cursor-pointer font-semibold">
-                                Generate Payment Link
-                              </Label>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                Create a secure payment link to send to customer via email or copy
-                              </p>
-                            </div>
-                          </div>
-                        </RadioGroup>
-                      </div>
-
                       {/* Action Button */}
                       <div className="flex gap-3 pt-4">
                         <Button
@@ -364,13 +312,11 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
                         >
                           {loading ? (
                             "Processing..."
-                          ) : checkoutMode === "pay_now" ? (
+                          ) : (
                             <>
                               <CreditCard className="mr-2 h-4 w-4" />
-                              Proceed to Checkout
+                              Enter Card Details
                             </>
-                          ) : (
-                            "Generate Payment Link"
                           )}
                         </Button>
                       </div>
@@ -383,57 +329,6 @@ export function PaymentEntryDialog({ document, trigger }: PaymentEntryDialogProp
                         </span>
                       </div>
                     </>
-                  )}
-
-                  {/* Generated Link Display */}
-                  {generatedLink && (
-                    <div className="space-y-4">
-                      <Alert>
-                        <CheckCircle2 className="h-4 w-4" />
-                        <AlertTitle>Payment Link Generated</AlertTitle>
-                        <AlertDescription>
-                          This link is valid for 24 hours. Send it to your customer via email or copy to clipboard.
-                        </AlertDescription>
-                      </Alert>
-
-                      <div className="p-4 bg-muted rounded-lg border">
-                        <p className="text-sm font-medium mb-2">Payment Link:</p>
-                        <p className="text-xs font-mono break-all text-muted-foreground">
-                          {generatedLink}
-                        </p>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          onClick={() => copyToClipboard(generatedLink)}
-                          className="flex-1"
-                        >
-                          {copySuccess ? (
-                            <>
-                              <CheckCircle2 className="mr-2 h-4 w-4" />
-                              Copied!
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="mr-2 h-4 w-4" />
-                              Copy Link
-                            </>
-                          )}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setGeneratedLink(null);
-                            setOpen(false);
-                            router.refresh();
-                          }}
-                        >
-                          Close
-                        </Button>
-                      </div>
-                    </div>
                   )}
                 </TabsContent>
 

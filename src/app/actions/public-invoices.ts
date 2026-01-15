@@ -195,11 +195,13 @@ export async function disablePublicSharing(documentId: string): Promise<{
 }
 
 /**
- * Create Stripe checkout for public invoice (NO AUTH REQUIRED)
+ * Create Stripe payment intent for public invoice (NO AUTH REQUIRED)
  */
-export async function createPublicInvoiceCheckout(shareToken: string): Promise<{
+export async function createPublicInvoicePaymentIntent(shareToken: string): Promise<{
   success: boolean;
-  sessionUrl?: string;
+  clientSecret?: string;
+  publishableKey?: string;
+  paymentIntentId?: string;
   error?: string;
 }> {
   try {
@@ -232,7 +234,7 @@ export async function createPublicInvoiceCheckout(shareToken: string): Promise<{
       return { success: false, error: "Payment gateway not configured" };
     }
 
-    // Decrypt credentials and create checkout session
+    // Decrypt credentials and create payment intent
     const { getDecryptedStripeCredentials } = await import("./stripe");
     const credentials = await getDecryptedStripeCredentials(document.organizationId);
 
@@ -240,24 +242,29 @@ export async function createPublicInvoiceCheckout(shareToken: string): Promise<{
       return { success: false, error: "Payment gateway credentials not found" };
     }
 
-    // Create checkout session using existing Stripe integration
-    const { createCheckoutSession } = await import("@/lib/payment-gateway/stripe/checkout");
+    const { createPaymentIntent } = await import(
+      "@/lib/payment-gateway/stripe/payment-intent"
+    );
 
-    const result = await createCheckoutSession(credentials, {
+    const result = await createPaymentIntent(credentials, {
       organizationId: document.organizationId,
       customerId: document.customerId,
       documentIds: [document.id],
       amount: document.balanceDue,
-      mode: "generate_link", // Use hosted mode for public payments
     });
 
-    if (!result.success || !result.sessionUrl) {
-      return { success: false, error: result.error || "Failed to create payment session" };
+    if (!result.success || !result.clientSecret) {
+      return { success: false, error: result.error || "Failed to create payment intent" };
     }
 
-    return { success: true, sessionUrl: result.sessionUrl };
+    return {
+      success: true,
+      clientSecret: result.clientSecret,
+      publishableKey: credentials.publishableKey,
+      paymentIntentId: result.paymentIntentId,
+    };
   } catch (error: any) {
-    console.error("Error creating public checkout:", error);
-    return { success: false, error: "Failed to create payment session" };
+    console.error("Error creating public payment intent:", error);
+    return { success: false, error: "Failed to create payment intent" };
   }
 }

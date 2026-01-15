@@ -1,7 +1,7 @@
 import { Suspense } from "react";
-import { notFound, redirect } from "next/navigation";
-import { getPublicInvoice, createPublicInvoiceCheckout } from "@/app/actions/public-invoices";
-import { PrintedInvoiceView } from "@/components/documents/printed-invoice-view";
+import { notFound } from "next/navigation";
+import { getPublicInvoice } from "@/app/actions/public-invoices";
+import { PublicInvoicePayment } from "@/components/payments/public-invoice-payment";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface PageProps {
@@ -17,22 +17,8 @@ async function PublicInvoiceContent({ token }: { token: string }) {
 
   const invoice = result.data;
 
-  async function handlePayNow() {
-    "use server";
-    const checkoutResult = await createPublicInvoiceCheckout(token);
-    if (checkoutResult.success && checkoutResult.sessionUrl) {
-      redirect(checkoutResult.sessionUrl);
-    }
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 px-4">
-      <PrintedInvoiceView
-        document={invoice as any}
-        showPayButton={invoice.canPay}
-        onPayClick={handlePayNow}
-      />
-    </div>
+    <PublicInvoicePayment token={token} invoice={invoice} />
   );
 }
 
