@@ -1,9 +1,9 @@
-'use server';
+"use server";
 
-import { prisma } from '@/lib/db';
-import { createAuthenticatedClient } from '@/lib/acumatica/auth';
-import { createPayment, mapDocumentType } from '@/lib/acumatica/payments';
-import type { CreatePaymentRequest } from '@/lib/acumatica/types';
+import { prisma } from "@/lib/db";
+import { createAuthenticatedClient } from "@/lib/acumatica/auth";
+import { createPayment, mapDocumentType } from "@/lib/acumatica/payments";
+import type { CreatePaymentRequest } from "@/lib/acumatica/types";
 
 interface SyncPaymentResult {
   success: boolean;
@@ -18,9 +18,11 @@ interface SyncPaymentResult {
  * @param paymentId - The ARFlow CustomerPayment ID to sync
  * @returns Result with success status and Acumatica payment reference or error
  */
-export async function syncPaymentToAcumatica(paymentId: string): Promise<SyncPaymentResult> {
+export async function syncPaymentToAcumatica(
+  paymentId: string,
+): Promise<SyncPaymentResult> {
   try {
-    console.log('[Sync Payment] Starting sync for payment:', paymentId);
+    console.log("[Sync Payment] Starting sync for payment:", paymentId);
 
     // 1. Fetch the payment with related data
     const payment = await prisma.customerPayment.findUnique({
@@ -41,8 +43,14 @@ export async function syncPaymentToAcumatica(paymentId: string): Promise<SyncPay
     }
 
     // 2. Check if already synced
-    if (payment.acumaticaSyncStatus === 'synced' && payment.acumaticaPaymentRef) {
-      console.log('[Sync Payment] Payment already synced:', payment.acumaticaPaymentRef);
+    if (
+      payment.acumaticaSyncStatus === "synced" &&
+      payment.acumaticaPaymentRef
+    ) {
+      console.log(
+        "[Sync Payment] Payment already synced:",
+        payment.acumaticaPaymentRef,
+      );
       return {
         success: true,
         acumaticaPaymentRef: payment.acumaticaPaymentRef,
@@ -54,21 +62,23 @@ export async function syncPaymentToAcumatica(paymentId: string): Promise<SyncPay
       where: { organizationId: payment.organizationId },
     });
 
-    if (!integration || integration.status !== 'ACTIVE') {
-      throw new Error('Acumatica integration is not active for this organization');
+    if (!integration || integration.status !== "ACTIVE") {
+      throw new Error(
+        "Acumatica integration is not active for this organization",
+      );
     }
 
     // 4. Check if payment configuration is set
     if (!integration.defaultCashAccount || !integration.defaultPaymentMethod) {
       throw new Error(
-        'Acumatica payment configuration is incomplete. Please set default cash account and payment method in integration settings.'
+        "Acumatica payment configuration is incomplete. Please set default cash account and payment method in integration settings.",
       );
     }
 
     // 5. Get customer's Acumatica ID
     if (!payment.customer.externalId) {
       throw new Error(
-        `Customer ${payment.customer.companyName} does not have an Acumatica Customer ID. Please sync customers first.`
+        `Customer ${payment.customer.companyName} does not have an Acumatica Customer ID. Please sync customers first.`,
       );
     }
 
@@ -79,7 +89,7 @@ export async function syncPaymentToAcumatica(paymentId: string): Promise<SyncPay
 
       if (!acumaticaRefNbr) {
         throw new Error(
-          `Document ${app.arDocument.documentNumber} does not have an Acumatica reference number`
+          `Document ${app.arDocument.documentNumber} does not have an Acumatica reference number`,
         );
       }
 
@@ -91,11 +101,11 @@ export async function syncPaymentToAcumatica(paymentId: string): Promise<SyncPay
     });
 
     // 7. Create authenticated Acumatica client
-    const client = await createAuthenticatedClient(integration.id);
+    const client = await createAuthenticatedClient(integration);
 
     // 8. Build payment request
     const paymentRequest: CreatePaymentRequest = {
-      type: 'Payment',
+      type: "Payment",
       customerId: payment.customer.externalId,
       paymentMethod: integration.defaultPaymentMethod,
       cashAccount: integration.defaultCashAccount,
@@ -103,10 +113,11 @@ export async function syncPaymentToAcumatica(paymentId: string): Promise<SyncPay
       paymentRef: payment.paymentNumber,
       applicationDate: payment.paymentDate,
       description: `Payment from ARFlow - ${payment.paymentNumber}`,
-      documentsToApply: documentsToApply.length > 0 ? documentsToApply : undefined,
+      documentsToApply:
+        documentsToApply.length > 0 ? documentsToApply : undefined,
     };
 
-    console.log('[Sync Payment] Creating payment in Acumatica:', {
+    console.log("[Sync Payment] Creating payment in Acumatica:", {
       customerId: paymentRequest.customerId,
       amount: paymentRequest.paymentAmount,
       documentsCount: documentsToApply.length,
@@ -115,7 +126,7 @@ export async function syncPaymentToAcumatica(paymentId: string): Promise<SyncPay
     // 9. Create payment in Acumatica
     const acumaticaPayment = await createPayment(client, paymentRequest);
 
-    console.log('[Sync Payment] Payment created in Acumatica:', {
+    console.log("[Sync Payment] Payment created in Acumatica:", {
       referenceNbr: acumaticaPayment.ReferenceNbr.value,
       status: acumaticaPayment.Status.value,
     });
@@ -125,7 +136,7 @@ export async function syncPaymentToAcumatica(paymentId: string): Promise<SyncPay
       where: { id: paymentId },
       data: {
         acumaticaPaymentRef: acumaticaPayment.ReferenceNbr.value,
-        acumaticaSyncStatus: 'synced',
+        acumaticaSyncStatus: "synced",
         acumaticaSyncError: null,
         acumaticaSyncedAt: new Date(),
       },
@@ -135,8 +146,8 @@ export async function syncPaymentToAcumatica(paymentId: string): Promise<SyncPay
     await prisma.integrationSyncLog.create({
       data: {
         integrationId: integration.id,
-        syncType: 'PAYMENT_SYNC',
-        status: 'SUCCESS',
+        syncType: "PAYMENT_SYNC",
+        status: "SUCCESS",
         startedAt: new Date(),
         completedAt: new Date(),
         invoicesFetched: 0,
@@ -155,23 +166,24 @@ export async function syncPaymentToAcumatica(paymentId: string): Promise<SyncPay
       },
     });
 
-    console.log('[Sync Payment] Sync completed successfully');
+    console.log("[Sync Payment] Sync completed successfully");
 
     return {
       success: true,
       acumaticaPaymentRef: acumaticaPayment.ReferenceNbr.value,
     };
   } catch (error) {
-    console.error('[Sync Payment] Error syncing payment:', error);
+    console.error("[Sync Payment] Error syncing payment:", error);
 
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error occurred";
 
     // Update payment record with error status
     try {
       await prisma.customerPayment.update({
         where: { id: paymentId },
         data: {
-          acumaticaSyncStatus: 'failed',
+          acumaticaSyncStatus: "failed",
           acumaticaSyncError: errorMessage,
         },
       });
@@ -191,8 +203,8 @@ export async function syncPaymentToAcumatica(paymentId: string): Promise<SyncPay
           await prisma.integrationSyncLog.create({
             data: {
               integrationId: integration.id,
-              syncType: 'PAYMENT_SYNC',
-              status: 'FAILED',
+              syncType: "PAYMENT_SYNC",
+              status: "FAILED",
               startedAt: new Date(),
               completedAt: new Date(),
               invoicesFetched: 0,
@@ -213,7 +225,10 @@ export async function syncPaymentToAcumatica(paymentId: string): Promise<SyncPay
         }
       }
     } catch (updateError) {
-      console.error('[Sync Payment] Error updating payment status:', updateError);
+      console.error(
+        "[Sync Payment] Error updating payment status:",
+        updateError,
+      );
     }
 
     return {
@@ -230,14 +245,16 @@ export async function syncPaymentToAcumatica(paymentId: string): Promise<SyncPay
  * @param paymentId - The ARFlow CustomerPayment ID to retry
  * @returns Result with success status
  */
-export async function retrySyncPayment(paymentId: string): Promise<SyncPaymentResult> {
-  console.log('[Sync Payment] Retrying sync for payment:', paymentId);
+export async function retrySyncPayment(
+  paymentId: string,
+): Promise<SyncPaymentResult> {
+  console.log("[Sync Payment] Retrying sync for payment:", paymentId);
 
   // Reset sync status before retrying
   await prisma.customerPayment.update({
     where: { id: paymentId },
     data: {
-      acumaticaSyncStatus: 'pending',
+      acumaticaSyncStatus: "pending",
       acumaticaSyncError: null,
     },
   });
