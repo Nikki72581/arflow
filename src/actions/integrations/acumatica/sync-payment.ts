@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { createAuthenticatedClient } from "@/lib/acumatica/auth";
 import { createPayment, mapDocumentType } from "@/lib/acumatica/payments";
 import type { CreatePaymentRequest } from "@/lib/acumatica/types";
+import type { SyncType } from "@prisma/client";
 
 interface SyncPaymentResult {
   success: boolean;
@@ -16,10 +17,12 @@ interface SyncPaymentResult {
  * Creates an AR Payment in Acumatica and updates the payment record with sync status
  *
  * @param paymentId - The ARFlow CustomerPayment ID to sync
+ * @param syncType - The type of sync (MANUAL or SCHEDULED)
  * @returns Result with success status and Acumatica payment reference or error
  */
 export async function syncPaymentToAcumatica(
   paymentId: string,
+  syncType: SyncType = "MANUAL",
 ): Promise<SyncPaymentResult> {
   try {
     console.log("[Sync Payment] Starting sync for payment:", paymentId);
@@ -146,7 +149,7 @@ export async function syncPaymentToAcumatica(
     await prisma.integrationSyncLog.create({
       data: {
         integrationId: integration.id,
-        syncType: "PAYMENT_SYNC",
+        syncType: syncType,
         status: "SUCCESS",
         startedAt: new Date(),
         completedAt: new Date(),
@@ -203,7 +206,7 @@ export async function syncPaymentToAcumatica(
           await prisma.integrationSyncLog.create({
             data: {
               integrationId: integration.id,
-              syncType: "PAYMENT_SYNC",
+              syncType: syncType,
               status: "FAILED",
               startedAt: new Date(),
               completedAt: new Date(),
@@ -243,10 +246,12 @@ export async function syncPaymentToAcumatica(
  * This is useful when the initial sync failed due to temporary issues
  *
  * @param paymentId - The ARFlow CustomerPayment ID to retry
+ * @param syncType - The type of sync (MANUAL or SCHEDULED)
  * @returns Result with success status
  */
 export async function retrySyncPayment(
   paymentId: string,
+  syncType: SyncType = "MANUAL",
 ): Promise<SyncPaymentResult> {
   console.log("[Sync Payment] Retrying sync for payment:", paymentId);
 
@@ -259,5 +264,5 @@ export async function retrySyncPayment(
     },
   });
 
-  return syncPaymentToAcumatica(paymentId);
+  return syncPaymentToAcumatica(paymentId, syncType);
 }
