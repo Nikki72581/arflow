@@ -1,4 +1,4 @@
-import { AcumaticaClient } from './client';
+import { AcumaticaClient } from "./client";
 import type {
   AcumaticaPayment,
   AcumaticaPaymentApplication,
@@ -7,7 +7,7 @@ import type {
   PaymentApplicationInput,
   OrderApplicationInput,
   AcumaticaValue,
-} from './types';
+} from "./types";
 
 /**
  * Helper function to wrap values in Acumatica's required format
@@ -44,7 +44,7 @@ function wrapValue<T>(value: T): AcumaticaValue<T> {
  */
 export async function createPayment(
   client: AcumaticaClient,
-  request: CreatePaymentRequest
+  request: CreatePaymentRequest,
 ): Promise<AcumaticaPayment> {
   // Ensure client is authenticated
   await client.authenticate();
@@ -66,7 +66,9 @@ export async function createPayment(
 
     if (request.applicationDate) {
       // Format date as ISO string
-      paymentBody.ApplicationDate = wrapValue(request.applicationDate.toISOString());
+      paymentBody.ApplicationDate = wrapValue(
+        request.applicationDate.toISOString(),
+      );
     }
 
     if (request.currencyId) {
@@ -96,7 +98,7 @@ export async function createPayment(
           }
 
           return application;
-        }
+        },
       );
     }
 
@@ -114,11 +116,11 @@ export async function createPayment(
           }
 
           return application;
-        }
+        },
       );
     }
 
-    console.log('[Acumatica Payments] Creating payment:', {
+    console.log("[Acumatica Payments] Creating payment:", {
       customerId: request.customerId,
       amount: request.paymentAmount,
       documentsCount: request.documentsToApply?.length || 0,
@@ -127,19 +129,19 @@ export async function createPayment(
 
     // Make the PUT request to create the payment
     // Use the private put method from AcumaticaClient
-    const createdPayment = await (client as any).put<AcumaticaPayment>(
-      'Payment',
-      paymentBody
-    );
+    const createdPayment = (await (client as any).put(
+      "Payment",
+      paymentBody,
+    )) as AcumaticaPayment;
 
-    console.log('[Acumatica Payments] Payment created successfully:', {
+    console.log("[Acumatica Payments] Payment created successfully:", {
       referenceNbr: createdPayment.ReferenceNbr.value,
       status: createdPayment.Status.value,
     });
 
     return createdPayment;
   } catch (error) {
-    console.error('[Acumatica Payments] Error creating payment:', error);
+    console.error("[Acumatica Payments] Error creating payment:", error);
     throw error;
   } finally {
     // Always logout to clean up session
@@ -157,36 +159,36 @@ export async function createPayment(
  */
 export async function releasePayment(
   client: AcumaticaClient,
-  referenceNbr: string
+  referenceNbr: string,
 ): Promise<AcumaticaPayment> {
   await client.authenticate();
 
   try {
-    console.log('[Acumatica Payments] Releasing payment:', referenceNbr);
+    console.log("[Acumatica Payments] Releasing payment:", referenceNbr);
 
     // Build the release request body
     const releaseBody = {
       entity: {
-        Type: wrapValue('Payment'),
+        Type: wrapValue("Payment"),
         ReferenceNbr: wrapValue(referenceNbr),
       },
       parameters: {},
     };
 
     // Make the POST request to release the payment
-    const releasedPayment = await (client as any).post<AcumaticaPayment>(
-      'Payment/ReleasePayment',
-      releaseBody
-    );
+    const releasedPayment = (await (client as any).post(
+      "Payment/ReleasePayment",
+      releaseBody,
+    )) as AcumaticaPayment;
 
-    console.log('[Acumatica Payments] Payment released successfully:', {
+    console.log("[Acumatica Payments] Payment released successfully:", {
       referenceNbr: releasedPayment.ReferenceNbr.value,
       status: releasedPayment.Status.value,
     });
 
     return releasedPayment;
   } catch (error) {
-    console.error('[Acumatica Payments] Error releasing payment:', error);
+    console.error("[Acumatica Payments] Error releasing payment:", error);
     throw error;
   } finally {
     await client.logout();
@@ -196,15 +198,17 @@ export async function releasePayment(
 /**
  * Map ARFlow document type to Acumatica document type
  */
-export function mapDocumentType(arflowType: string): 'Invoice' | 'Credit Memo' | 'Debit Memo' {
+export function mapDocumentType(
+  arflowType: string,
+): "Invoice" | "Credit Memo" | "Debit Memo" {
   switch (arflowType.toUpperCase()) {
-    case 'INVOICE':
-      return 'Invoice';
-    case 'CREDIT_MEMO':
-      return 'Credit Memo';
-    case 'DEBIT_MEMO':
-      return 'Debit Memo';
+    case "INVOICE":
+      return "Invoice";
+    case "CREDIT_MEMO":
+      return "Credit Memo";
+    case "DEBIT_MEMO":
+      return "Debit Memo";
     default:
-      return 'Invoice'; // Default to invoice
+      return "Invoice"; // Default to invoice
   }
 }
