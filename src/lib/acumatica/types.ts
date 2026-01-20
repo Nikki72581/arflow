@@ -108,13 +108,13 @@ export interface AcumaticaErrorResponse {
  * Credentials for authentication
  */
 export interface AcumaticaPasswordCredentials {
-  type: 'password';
+  type: "password";
   username: string;
   password: string;
 }
 
 export interface AcumaticaOAuthCredentials {
-  type: 'oauth';
+  type: "oauth";
   accessToken: string;
   refreshToken?: string;
   expiresAt?: number;
@@ -167,4 +167,80 @@ export interface SyncResult {
   salesCreated: number;
   clientsCreated: number;
   projectsCreated: number;
+}
+
+/**
+ * AR Payment entity
+ */
+export interface AcumaticaPayment {
+  ReferenceNbr: AcumaticaValue<string>;
+  Type: AcumaticaValue<string>;
+  Status: AcumaticaValue<string>;
+  CustomerID: AcumaticaValue<string>;
+  PaymentAmount: AcumaticaValue<number>;
+  PaymentMethod: AcumaticaValue<string>;
+  CashAccount: AcumaticaValue<string>;
+  PaymentRef?: AcumaticaValue<string>;
+  ApplicationDate?: AcumaticaValue<string>;
+  CurrencyID?: AcumaticaValue<string>;
+  Description?: AcumaticaValue<string>;
+  Hold?: AcumaticaValue<boolean>;
+  DocumentsToApply?: AcumaticaPaymentApplication[];
+  OrdersToApply?: AcumaticaOrderApplication[];
+}
+
+/**
+ * Payment application to invoices/credit memos/debit memos
+ */
+export interface AcumaticaPaymentApplication {
+  DocType: AcumaticaValue<string>;
+  ReferenceNbr: AcumaticaValue<string>;
+  AmountPaid: AcumaticaValue<number>;
+  DocLineNbr?: AcumaticaValue<number>; // Required if Pay by Line is enabled
+}
+
+/**
+ * Payment application to sales orders
+ */
+export interface AcumaticaOrderApplication {
+  OrderType: AcumaticaValue<string>;
+  OrderNbr: AcumaticaValue<string>;
+  AmountPaid?: AcumaticaValue<number>;
+}
+
+/**
+ * Request parameters for creating a payment
+ */
+export interface CreatePaymentRequest {
+  type: string;
+  customerId: string;
+  paymentMethod: string;
+  cashAccount: string;
+  paymentAmount: number;
+  paymentRef?: string;
+  applicationDate?: Date;
+  currencyId?: string;
+  description?: string;
+  hold?: boolean;
+  documentsToApply?: PaymentApplicationInput[];
+  ordersToApply?: OrderApplicationInput[];
+}
+
+/**
+ * Payment application input (not wrapped in AcumaticaValue)
+ */
+export interface PaymentApplicationInput {
+  docType: "Invoice" | "Credit Memo" | "Debit Memo";
+  referenceNbr: string;
+  amountPaid: number;
+  docLineNbr?: number;
+}
+
+/**
+ * Order application input (not wrapped in AcumaticaValue)
+ */
+export interface OrderApplicationInput {
+  orderType: string;
+  orderNbr: string;
+  amountPaid?: number;
 }

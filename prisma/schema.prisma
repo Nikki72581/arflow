@@ -504,6 +504,12 @@ model CustomerPayment {
   externalSystem String?
   externalId     String?
 
+  // Acumatica Payment Sync
+  acumaticaPaymentRef  String? // AR Payment reference number from Acumatica (e.g., "PMT001234")
+  acumaticaSyncStatus  String? // "pending", "synced", "failed"
+  acumaticaSyncError   String? // Error message if sync failed
+  acumaticaSyncedAt    DateTime? // When payment was synced to Acumatica
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -613,6 +619,10 @@ model AcumaticaIntegration {
   // Unmapped Customer Handling
   unmappedCustomerAction UnmappedAction @default(SKIP)
   defaultCustomerUserId  String?
+
+  // Payment Configuration
+  defaultCashAccount   String? // Default cash account for payments (e.g., "10200")
+  defaultPaymentMethod String? // Default payment method code (e.g., "DEMOCC", "CHECK")
 
   // Sync Schedule
   syncFrequency     SyncFrequency @default(MANUAL)

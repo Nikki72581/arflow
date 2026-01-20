@@ -1,34 +1,36 @@
-import { prisma } from '@/lib/db';
-import type Stripe from 'stripe';
+import { prisma } from "@/lib/db";
+import type Stripe from "stripe";
+import { syncPaymentToAcumatica } from "@/actions/integrations/acumatica/sync-payment";
 
 /**
  * Handle successful checkout session completion
  * This is called when a customer completes payment on Stripe Checkout
  */
 export async function handleCheckoutSessionCompleted(
-  session: Stripe.Checkout.Session
+  session: Stripe.Checkout.Session,
 ) {
   const sessionId = session.id;
 
   // Safely extract payment intent ID
-  const paymentIntentId = typeof session.payment_intent === 'string'
-    ? session.payment_intent
-    : session.payment_intent?.id;
+  const paymentIntentId =
+    typeof session.payment_intent === "string"
+      ? session.payment_intent
+      : session.payment_intent?.id;
 
   if (!paymentIntentId) {
-    console.error('No payment intent ID found for session:', sessionId);
+    console.error("No payment intent ID found for session:", sessionId);
     return;
   }
 
   // Validate metadata exists and has required fields
   if (!session.metadata?.documentIds) {
-    console.error('Missing metadata or documentIds for session:', sessionId);
+    console.error("Missing metadata or documentIds for session:", sessionId);
     return;
   }
 
   const metadata = session.metadata;
 
-  console.log('Processing checkout.session.completed:', sessionId);
+  console.log("Processing checkout.session.completed:", sessionId);
 
   // Find payment record
   const payment = await prisma.customerPayment.findFirst({
@@ -36,22 +38,24 @@ export async function handleCheckoutSessionCompleted(
   });
 
   if (!payment) {
-    console.error('Payment not found for session:', sessionId);
+    console.error("Payment not found for session:", sessionId);
     return;
   }
 
   // Check for duplicate processing (idempotency)
-  if (payment.status === 'APPLIED' && payment.gatewayTransactionId) {
-    console.log('Payment already processed (idempotent):', payment.id);
+  if (payment.status === "APPLIED" && payment.gatewayTransactionId) {
+    console.log("Payment already processed (idempotent):", payment.id);
     return; // Already processed - this is OK, Stripe may retry webhooks
   }
 
   try {
     // Parse and validate document IDs
-    const documentIds = metadata.documentIds.split(',').filter(id => id.trim());
+    const documentIds = metadata.documentIds
+      .split(",")
+      .filter((id) => id.trim());
 
     if (documentIds.length === 0) {
-      throw new Error('No valid document IDs found in metadata');
+      throw new Error("No valid document IDs found in metadata");
     }
 
     // Use a transaction to ensure all updates are atomic
@@ -61,8 +65,8 @@ export async function handleCheckoutSessionCompleted(
       await tx.customerPayment.update({
         where: { id: payment.id },
         data: {
-          status: 'APPLIED',
-          checkoutSessionStatus: 'complete',
+          status: "APPLIED",
+          checkoutSessionStatus: "complete",
           gatewayTransactionId: paymentIntentId,
           gatewayResponse: JSON.parse(JSON.stringify(session)),
         },
@@ -79,7 +83,7 @@ export async function handleCheckoutSessionCompleted(
         });
 
         if (!document) {
-          console.warn('Document not found:', documentId);
+          console.warn("Document not found:", documentId);
           continue;
         }
 
@@ -106,9 +110,9 @@ export async function handleCheckoutSessionCompleted(
         // Determine new status
         let newStatus = document.status;
         if (newBalance === 0) {
-          newStatus = 'PAID';
+          newStatus = "PAID";
         } else if (newAmountPaid > 0) {
-          newStatus = 'PARTIAL';
+          newStatus = "PARTIAL";
         }
 
         await tx.arDocument.update({
@@ -125,9 +129,28 @@ export async function handleCheckoutSessionCompleted(
       }
     });
 
-    console.log('Checkout session completed successfully:', sessionId);
+    console.log("Checkout session completed successfully:", sessionId);
+
+    // Sync payment to Acumatica (async, don't block webhook response)
+    syncPaymentToAcumatica(payment.id)
+      .then((result) => {
+        if (result.success) {
+          console.log(
+            "[Webhook] Payment synced to Acumatica:",
+            result.acumaticaPaymentRef,
+          );
+        } else {
+          console.error(
+            "[Webhook] Failed to sync payment to Acumatica:",
+            result.error,
+          );
+        }
+      })
+      .catch((error) => {
+        console.error("[Webhook] Error syncing payment to Acumatica:", error);
+      });
   } catch (error) {
-    console.error('Error processing checkout session completed:', error);
+    console.error("Error processing checkout session completed:", error);
     throw error; // Re-throw so Stripe will retry
   }
 }
@@ -137,27 +160,27 @@ export async function handleCheckoutSessionCompleted(
  * This is called when a checkout session expires without payment (after 24 hours)
  */
 export async function handleCheckoutSessionExpired(
-  session: Stripe.Checkout.Session
+  session: Stripe.Checkout.Session,
 ) {
   const sessionId = session.id;
 
-  console.log('Processing checkout.session.expired:', sessionId);
+  console.log("Processing checkout.session.expired:", sessionId);
 
   try {
     const result = await prisma.customerPayment.updateMany({
       where: {
         stripeCheckoutSessionId: sessionId,
-        status: 'PENDING', // Only update pending payments
+        status: "PENDING", // Only update pending payments
       },
       data: {
-        status: 'VOID',
-        checkoutSessionStatus: 'expired',
+        status: "VOID",
+        checkoutSessionStatus: "expired",
       },
     });
 
-    console.log('Checkout session expired, updated records:', result.count);
+    console.log("Checkout session expired, updated records:", result.count);
   } catch (error) {
-    console.error('Error processing checkout session expired:', error);
+    console.error("Error processing checkout session expired:", error);
     throw error;
   }
 }
@@ -167,17 +190,19 @@ export async function handleCheckoutSessionExpired(
  * This is called when a payment attempt fails (card declined, etc.)
  */
 export async function handlePaymentIntentFailed(
-  paymentIntent: Stripe.PaymentIntent
+  paymentIntent: Stripe.PaymentIntent,
 ) {
   const paymentIntentId = paymentIntent.id;
 
-  console.log('Processing payment_intent.payment_failed:', paymentIntentId);
+  console.log("Processing payment_intent.payment_failed:", paymentIntentId);
 
   try {
     // Build search criteria - use gateway transaction ID or metadata
     const whereConditions = [
       { gatewayTransactionId: paymentIntentId },
-      paymentIntent.metadata?.paymentId ? { id: paymentIntent.metadata.paymentId } : null,
+      paymentIntent.metadata?.paymentId
+        ? { id: paymentIntent.metadata.paymentId }
+        : null,
     ].filter(Boolean) as any[];
 
     // Find payment by gateway transaction ID or checkout session
@@ -188,13 +213,13 @@ export async function handlePaymentIntentFailed(
     });
 
     if (!payment) {
-      console.error('Payment not found for intent:', paymentIntentId);
+      console.error("Payment not found for intent:", paymentIntentId);
       return;
     }
 
     // Prevent voiding already applied payments
-    if (payment.status === 'APPLIED') {
-      console.warn('Cannot void already applied payment:', payment.id);
+    if (payment.status === "APPLIED") {
+      console.warn("Cannot void already applied payment:", payment.id);
       return;
     }
 
@@ -202,15 +227,15 @@ export async function handlePaymentIntentFailed(
     await prisma.customerPayment.update({
       where: { id: payment.id },
       data: {
-        status: 'VOID',
+        status: "VOID",
         gatewayResponse: JSON.parse(JSON.stringify(paymentIntent)),
         gatewayTransactionId: paymentIntentId,
       },
     });
 
-    console.log('Payment intent failed, payment voided:', payment.id);
+    console.log("Payment intent failed, payment voided:", payment.id);
   } catch (error) {
-    console.error('Error processing payment intent failed:', error);
+    console.error("Error processing payment intent failed:", error);
     throw error;
   }
 }
@@ -220,14 +245,17 @@ export async function handlePaymentIntentFailed(
  * This is called when a Payment Element payment succeeds
  */
 export async function handlePaymentIntentSucceeded(
-  paymentIntent: Stripe.PaymentIntent
+  paymentIntent: Stripe.PaymentIntent,
 ) {
   const paymentIntentId = paymentIntent.id;
 
-  console.log('Processing payment_intent.succeeded:', paymentIntentId);
+  console.log("Processing payment_intent.succeeded:", paymentIntentId);
 
   if (!paymentIntent.metadata?.documentIds) {
-    console.error('Missing metadata or documentIds for payment intent:', paymentIntentId);
+    console.error(
+      "Missing metadata or documentIds for payment intent:",
+      paymentIntentId,
+    );
     return;
   }
 
@@ -235,35 +263,37 @@ export async function handlePaymentIntentSucceeded(
     where: {
       OR: [
         { gatewayTransactionId: paymentIntentId },
-        paymentIntent.metadata?.paymentId ? { id: paymentIntent.metadata.paymentId } : null,
+        paymentIntent.metadata?.paymentId
+          ? { id: paymentIntent.metadata.paymentId }
+          : null,
       ].filter(Boolean) as any[],
     },
   });
 
   if (!payment) {
-    console.error('Payment not found for intent:', paymentIntentId);
+    console.error("Payment not found for intent:", paymentIntentId);
     return;
   }
 
-  if (payment.status === 'APPLIED' && payment.gatewayTransactionId) {
-    console.log('Payment already processed (idempotent):', payment.id);
+  if (payment.status === "APPLIED" && payment.gatewayTransactionId) {
+    console.log("Payment already processed (idempotent):", payment.id);
     return;
   }
 
   try {
     const documentIds = paymentIntent.metadata.documentIds
-      .split(',')
+      .split(",")
       .filter((id) => id.trim());
 
     if (documentIds.length === 0) {
-      throw new Error('No valid document IDs found in metadata');
+      throw new Error("No valid document IDs found in metadata");
     }
 
     await prisma.$transaction(async (tx) => {
       await tx.customerPayment.update({
         where: { id: payment.id },
         data: {
-          status: 'APPLIED',
+          status: "APPLIED",
           checkoutSessionStatus: paymentIntent.status,
           gatewayTransactionId: paymentIntentId,
           gatewayResponse: JSON.parse(JSON.stringify(paymentIntent)),
@@ -280,7 +310,7 @@ export async function handlePaymentIntentSucceeded(
         });
 
         if (!document) {
-          console.warn('Document not found:', documentId);
+          console.warn("Document not found:", documentId);
           continue;
         }
 
@@ -304,9 +334,9 @@ export async function handlePaymentIntentSucceeded(
 
         let newStatus = document.status;
         if (newBalance === 0) {
-          newStatus = 'PAID';
+          newStatus = "PAID";
         } else if (newAmountPaid > 0) {
-          newStatus = 'PARTIAL';
+          newStatus = "PARTIAL";
         }
 
         await tx.arDocument.update({
@@ -323,9 +353,28 @@ export async function handlePaymentIntentSucceeded(
       }
     });
 
-    console.log('Payment intent succeeded:', paymentIntentId);
+    console.log("Payment intent succeeded:", paymentIntentId);
+
+    // Sync payment to Acumatica (async, don't block webhook response)
+    syncPaymentToAcumatica(payment.id)
+      .then((result) => {
+        if (result.success) {
+          console.log(
+            "[Webhook] Payment synced to Acumatica:",
+            result.acumaticaPaymentRef,
+          );
+        } else {
+          console.error(
+            "[Webhook] Failed to sync payment to Acumatica:",
+            result.error,
+          );
+        }
+      })
+      .catch((error) => {
+        console.error("[Webhook] Error syncing payment to Acumatica:", error);
+      });
   } catch (error) {
-    console.error('Error processing payment intent succeeded:', error);
+    console.error("Error processing payment intent succeeded:", error);
     throw error;
   }
 }
