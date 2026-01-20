@@ -159,7 +159,7 @@ export async function syncPaymentToAcumatica(
         documentsCreated: 0,
         customersCreated: 0,
         errorsCount: 0,
-        results: {
+        createdRecords: {
           paymentId: payment.id,
           paymentNumber: payment.paymentNumber,
           acumaticaPaymentRef: acumaticaPayment.ReferenceNbr.value,
@@ -216,7 +216,7 @@ export async function syncPaymentToAcumatica(
               documentsCreated: 0,
               customersCreated: 0,
               errorsCount: 1,
-              errors: [
+              errorDetails: [
                 {
                   paymentId: payment.id,
                   paymentNumber: payment.paymentNumber,
