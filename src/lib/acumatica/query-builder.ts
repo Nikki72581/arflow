@@ -216,15 +216,18 @@ export class AcumaticaQueryBuilder {
     }
 
     // Date range filter (required)
+    // Use datetimeoffset format for Acumatica REST API compatibility
     const dateField = filterConfig.dateRange.field;
-    filters.push(
-      `${dateField} ge datetime'${filterConfig.dateRange.startDate}'`,
-    );
+    const startDateWithTime = filterConfig.dateRange.startDate.includes("T")
+      ? filterConfig.dateRange.startDate
+      : `${filterConfig.dateRange.startDate}T00:00:00Z`;
+    filters.push(`${dateField} ge datetimeoffset'${startDateWithTime}'`);
 
     if (filterConfig.dateRange.endDate) {
-      filters.push(
-        `${dateField} le datetime'${filterConfig.dateRange.endDate}'`,
-      );
+      const endDateWithTime = filterConfig.dateRange.endDate.includes("T")
+        ? filterConfig.dateRange.endDate
+        : `${filterConfig.dateRange.endDate}T23:59:59Z`;
+      filters.push(`${dateField} le datetimeoffset'${endDateWithTime}'`);
     }
 
     // Branch filter
