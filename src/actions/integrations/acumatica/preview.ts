@@ -33,6 +33,9 @@ export async function previewAcumaticaData(
     throw new Error("Only administrators can preview Acumatica data");
   }
 
+  let client: Awaited<ReturnType<typeof createAuthenticatedClient>> | null =
+    null;
+
   try {
     // Get the integration configuration
     const integration = await prisma.acumaticaIntegration.findUnique({
@@ -55,81 +58,133 @@ export async function previewAcumaticaData(
       integration.fieldMappings as FieldMappingConfig | null;
     const filterConfig = integration.filterConfig as FilterConfig | null;
 
+    console.log(
+      "[Preview] Field mappings:",
+      JSON.stringify(fieldMappings, null, 2),
+    );
+    console.log(
+      "[Preview] Filter config:",
+      JSON.stringify(filterConfig, null, 2),
+    );
+
     if (!fieldMappings || !isValidFieldMapping(fieldMappings)) {
-      throw new Error("Invalid field mappings configuration");
+      // Build detailed error message about what's missing
+      const fm = fieldMappings as any;
+      const missing: string[] = [];
+      if (!fm) {
+        missing.push("fieldMappings not configured");
+      } else {
+        if (!fm.amount?.sourceField) missing.push("amount");
+        if (!fm.balance?.sourceField) missing.push("balance");
+        if (!fm.date?.sourceField) missing.push("date");
+        if (!fm.uniqueId?.sourceField) missing.push("uniqueId");
+        if (!fm.customer?.idField) missing.push("customer.idField");
+        if (!["INVOICE_TOTAL", "LINE_LEVEL"].includes(fm.importLevel))
+          missing.push("importLevel");
+      }
+      throw new Error(
+        `Invalid field mappings configuration. Please select a document type first. Missing: ${missing.join(", ")}`,
+      );
     }
 
     if (!filterConfig || !isValidFilterConfig(filterConfig)) {
-      throw new Error("Invalid filter configuration");
+      // Build detailed error message about what's missing
+      const fc = filterConfig as any;
+      const missing: string[] = [];
+      if (!fc) {
+        missing.push("filterConfig not configured");
+      } else {
+        if (!fc.status?.field) missing.push("status.field");
+        if (!Array.isArray(fc.status?.allowedValues))
+          missing.push("status.allowedValues");
+        if (!fc.dateRange?.field) missing.push("dateRange.field");
+        if (!fc.dateRange?.startDate) missing.push("dateRange.startDate");
+      }
+      throw new Error(
+        `Invalid filter configuration. Please select a document type first. Missing: ${missing.join(", ")}`,
+      );
     }
 
     // Create authenticated client
-    const client = await createAuthenticatedClient(integration);
+    console.log("[Preview] Creating authenticated client...");
+    client = await createAuthenticatedClient(integration);
+    console.log("[Preview] Client authenticated successfully");
 
-    try {
-      // Build preview query
-      const query = AcumaticaQueryBuilder.buildPreviewQuery(
-        integration.apiVersion,
-        integration.dataSourceType,
-        integration.dataSourceEntity,
-        fieldMappings,
-        filterConfig,
-        limit,
+    // Build preview query
+    const query = AcumaticaQueryBuilder.buildPreviewQuery(
+      integration.apiVersion,
+      integration.dataSourceType,
+      integration.dataSourceEntity,
+      fieldMappings,
+      filterConfig,
+      limit,
+    );
+
+    console.log("[Preview] Query:", query);
+
+    // Fetch sample data
+    // Generic Inquiry and DAC OData endpoints require Basic Auth instead of session cookies
+    const useBasicAuth =
+      integration.dataSourceType === "GENERIC_INQUIRY" ||
+      integration.dataSourceType === "DAC_ODATA";
+
+    const response = useBasicAuth
+      ? await client.makeBasicAuthRequest("GET", query)
+      : await client.makeRequest("GET", query);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[Preview] API error response:", errorText);
+      throw new Error(
+        `Failed to fetch preview data: ${response.status} ${response.statusText}`,
       );
-
-      console.log("[Preview] Query:", query);
-
-      // Fetch sample data
-      // Generic Inquiry and DAC OData endpoints require Basic Auth instead of session cookies
-      const useBasicAuth =
-        integration.dataSourceType === "GENERIC_INQUIRY" ||
-        integration.dataSourceType === "DAC_ODATA";
-
-      const response = useBasicAuth
-        ? await client.makeBasicAuthRequest("GET", query)
-        : await client.makeRequest("GET", query);
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch preview data: ${response.status} ${response.statusText}`,
-        );
-      }
-
-      const data = await response.json();
-      const records = data.value || (Array.isArray(data) ? data : [data]);
-
-      console.log(`[Preview] Fetched ${records.length} records`);
-
-      // Extract and validate data
-      const extractedRecords = records
-        .map((record: any) => {
-          try {
-            return FieldExtractor.extractInvoiceData(record, fieldMappings);
-          } catch (error) {
-            console.error("[Preview] Error extracting record:", error);
-            return null;
-          }
-        })
-        .filter(Boolean);
-
-      // Perform validation
-      const validation = await validatePreviewData(
-        extractedRecords,
-        integration.customerMappings,
-        integration.unmappedCustomerAction,
-      );
-
-      return {
-        records: extractedRecords,
-        validation,
-        query,
-      };
-    } finally {
-      await client.logout();
     }
+
+    const data = await response.json();
+    const records = data.value || (Array.isArray(data) ? data : [data]);
+
+    console.log(`[Preview] Fetched ${records.length} records`);
+
+    // Extract and validate data
+    const extractedRecords = records
+      .map((record: any) => {
+        try {
+          return FieldExtractor.extractInvoiceData(record, fieldMappings);
+        } catch (error) {
+          console.error("[Preview] Error extracting record:", error);
+          return null;
+        }
+      })
+      .filter(Boolean);
+
+    // Perform validation
+    const validation = await validatePreviewData(
+      extractedRecords,
+      integration.customerMappings,
+      integration.unmappedCustomerAction,
+    );
+
+    return {
+      records: extractedRecords,
+      validation,
+      query,
+    };
   } catch (error) {
     console.error("[Preview] Error:", error);
-    throw error;
+    // Re-throw with a cleaner message for the client
+    const message =
+      error instanceof Error ? error.message : "Unknown error occurred";
+    throw new Error(`Preview failed: ${message}`);
+  } finally {
+    // Always logout to clean up the Acumatica session
+    if (client) {
+      try {
+        await client.logout();
+        console.log("[Preview] Logged out of Acumatica session");
+      } catch (logoutError) {
+        console.error("[Preview] Failed to logout:", logoutError);
+      }
+    }
   }
 }
 
