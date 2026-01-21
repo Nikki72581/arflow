@@ -261,6 +261,7 @@ export async function syncDocumentsFromAcumatica(
           if (existingCustomer) {
             customerId = existingCustomer.id;
           } else if (integration.unmappedCustomerAction === "SKIP") {
+            // Skip documents with unmapped customers
             documentsSkipped++;
             skippedRecords.push({
               documentRef: extractedData.uniqueId,
@@ -273,8 +274,8 @@ export async function syncDocumentsFromAcumatica(
               reason: `Unmapped customer: ${extractedData.customerId}`,
             });
             continue;
-          } else {
-            // Create new customer
+          } else if (integration.unmappedCustomerAction === "AUTO_CREATE") {
+            // Automatically create new customer
             const newCustomer = await prisma.customer.create({
               data: {
                 organizationId: integration.organizationId,
@@ -316,6 +317,48 @@ export async function syncDocumentsFromAcumatica(
 
             // Update lookup for future records
             customerMappingLookup.set(extractedData.customerId, customerId);
+          } else if (
+            integration.unmappedCustomerAction === "DEFAULT_USER" &&
+            integration.defaultCustomerUserId
+          ) {
+            // Assign to default customer
+            // First check if the default user has a linked customer
+            const defaultUser = await prisma.user.findUnique({
+              where: { id: integration.defaultCustomerUserId },
+              include: { customer: true },
+            });
+
+            if (defaultUser?.customerId) {
+              customerId = defaultUser.customerId;
+            } else {
+              // Skip if default user doesn't have a customer linked
+              documentsSkipped++;
+              skippedRecords.push({
+                documentRef: extractedData.uniqueId,
+                customerId: extractedData.customerId,
+                customerName: extractedData.customerName,
+                amount: extractedData.amount,
+                balance: extractedData.balance,
+                date: extractedData.date.toISOString(),
+                action: "skipped",
+                reason: `Default customer not configured properly`,
+              });
+              continue;
+            }
+          } else {
+            // Fallback: skip if no valid action
+            documentsSkipped++;
+            skippedRecords.push({
+              documentRef: extractedData.uniqueId,
+              customerId: extractedData.customerId,
+              customerName: extractedData.customerName,
+              amount: extractedData.amount,
+              balance: extractedData.balance,
+              date: extractedData.date.toISOString(),
+              action: "skipped",
+              reason: `Unmapped customer: ${extractedData.customerId} (no handling configured)`,
+            });
+            continue;
           }
         }
 

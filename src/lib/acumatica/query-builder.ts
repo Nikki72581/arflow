@@ -240,6 +240,18 @@ export class AcumaticaQueryBuilder {
       filters.push(`${balanceField} ${balanceOperator} ${balanceValue}m`);
     }
 
+    // Payment method filter
+    if (
+      filterConfig.paymentMethod?.mode === "SELECTED" &&
+      filterConfig.paymentMethod.selectedValues?.length
+    ) {
+      const paymentMethodFilters = filterConfig.paymentMethod.selectedValues
+        .map((pm) => `${filterConfig.paymentMethod!.field} eq '${pm}'`)
+        .join(" or ");
+
+      filters.push(`(${paymentMethodFilters})`);
+    }
+
     // Branch filter
     if (
       filterConfig.branch?.mode === "SELECTED" &&

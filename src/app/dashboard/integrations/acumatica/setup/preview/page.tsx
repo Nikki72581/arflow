@@ -157,7 +157,7 @@ export default function PreviewPage() {
           Preview & Activate
         </h1>
         <p className="text-muted-foreground mt-2">
-          Step 3 of 3: Review your configuration and activate the integration
+          Step 4 of 4: Review your configuration and activate the integration
         </p>
       </div>
 
@@ -441,7 +441,7 @@ export default function PreviewPage() {
         <Button
           variant="outline"
           onClick={() =>
-            router.push("/dashboard/integrations/acumatica/setup/document-type")
+            router.push("/dashboard/integrations/acumatica/setup/filters")
           }
         >
           <ArrowLeft className="mr-2 h-4 w-4" />

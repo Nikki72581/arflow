@@ -147,6 +147,13 @@ export interface FilterConfig {
     value: number; // typically 0 to filter for open balances
   };
 
+  // Payment method filter - only import documents with specific payment method
+  paymentMethod?: {
+    field: string; // e.g., "PaymentMethod" or "FinancialSettings/PaymentMethod"
+    mode: "ALL" | "SELECTED";
+    selectedValues?: string[]; // Payment method IDs if mode is SELECTED
+  };
+
   // Branch filter
   branch?: {
     field: string; // e.g., "BranchID"

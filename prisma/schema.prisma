@@ -103,6 +103,7 @@ enum DataSourceType {
 
 enum UnmappedAction {
   SKIP // Don't import records without mapped customer
+  AUTO_CREATE // Automatically create customer records
   DEFAULT_USER // Assign to defaultCustomerUserId
 }
 
@@ -153,7 +154,7 @@ model Organization {
   updatedAt  DateTime @updatedAt
 
   // Branding for invoices
-  logoUrl String?
+  logoUrl  String?
   address1 String?
   address2 String?
   city     String?
@@ -219,7 +220,7 @@ model User {
 }
 
 model Customer {
-  id             String         @id @default(cuid())
+  id             String  @id @default(cuid())
   customerNumber String? // External customer number/code
   companyName    String
   contactName    String?
@@ -244,12 +245,12 @@ model Customer {
   shippingCountry  String?
 
   // AR Management fields
-  creditLimit     Float?         @default(0)
-  currentBalance  Float          @default(0) // Calculated field, updated on document/payment changes
-  status          CustomerStatus @default(ACTIVE)
-  paymentTerms    String? @map("payment_terms_legacy") // Deprecated: legacy payment terms text
-  paymentTermId   String? // Foreign key to PaymentTermType
-  notes           String?
+  creditLimit    Float?         @default(0)
+  currentBalance Float          @default(0) // Calculated field, updated on document/payment changes
+  status         CustomerStatus @default(ACTIVE)
+  paymentTerms   String?        @map("payment_terms_legacy") // Deprecated: legacy payment terms text
+  paymentTermId  String? // Foreign key to PaymentTermType
+  notes          String?
 
   // Portal Access
   portalEnabled Boolean   @default(false)
@@ -266,7 +267,7 @@ model Customer {
   updatedAt DateTime @updatedAt
 
   organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  paymentTerm  PaymentTermType? @relation(fields: [paymentTermId], references: [id], onDelete: SetNull)
+  paymentTerm  PaymentTermType?  @relation(fields: [paymentTermId], references: [id], onDelete: SetNull)
   arDocuments  ArDocument[]
   payments     CustomerPayment[]
   portalUsers  User[] // Portal users linked to this customer
@@ -284,11 +285,11 @@ model Customer {
 // ============================================
 
 model ArDocument {
-  id             String         @id @default(cuid())
-  organizationId String
-  customerId     String
-  documentType   DocumentType
-  documentNumber String // Invoice number, CM number, etc.
+  id              String       @id @default(cuid())
+  organizationId  String
+  customerId      String
+  documentType    DocumentType
+  documentNumber  String // Invoice number, CM number, etc.
   referenceNumber String? // PO number, reference, etc.
 
   // Dates
@@ -298,9 +299,9 @@ model ArDocument {
 
   // Amounts
   subtotal    Float
-  taxAmount   Float  @default(0)
+  taxAmount   Float @default(0)
   totalAmount Float
-  amountPaid  Float  @default(0)
+  amountPaid  Float @default(0)
   balanceDue  Float // totalAmount - amountPaid
 
   // Status
@@ -317,7 +318,7 @@ model ArDocument {
   earlyPaymentDeadline DateTime? // Date by which discount applies
   discountPercentage   Float? // Discount percentage if paid early
   discountAvailable    Float? // Dollar amount of discount available
-  discountTaken        Float    @default(0) // Discount actually applied
+  discountTaken        Float     @default(0) // Discount actually applied
 
   // Payment Schedule
   hasPaymentSchedule Boolean @default(false)
@@ -410,7 +411,7 @@ model DocumentTypeSetting {
 }
 
 model PaymentTermType {
-  id             String   @id @default(cuid())
+  id             String @id @default(cuid())
   organizationId String
 
   // Display information
@@ -444,7 +445,7 @@ model PaymentTermType {
 }
 
 model PaymentScheduleInstallment {
-  id           String   @id @default(cuid())
+  id           String @id @default(cuid())
   arDocumentId String
 
   // Installment details
@@ -474,16 +475,16 @@ model PaymentScheduleInstallment {
 // ============================================
 
 model CustomerPayment {
-  id             String        @id @default(cuid())
-  organizationId String
-  customerId     String
-  paymentNumber  String // Payment reference number
-  paymentDate    DateTime
-  amount         Float
-  paymentMethod  PaymentMethod @default(CHECK)
+  id              String        @id @default(cuid())
+  organizationId  String
+  customerId      String
+  paymentNumber   String // Payment reference number
+  paymentDate     DateTime
+  amount          Float
+  paymentMethod   PaymentMethod @default(CHECK)
   referenceNumber String? // Check number, wire confirmation, etc.
-  status         PaymentStatus @default(APPLIED)
-  notes          String?
+  status          PaymentStatus @default(APPLIED)
+  notes           String?
 
   // Payment Gateway Integration (Authorize.net, Stripe, etc.)
   gatewayTransactionId   String? // Transaction ID from payment gateway
@@ -505,10 +506,10 @@ model CustomerPayment {
   externalId     String?
 
   // Acumatica Payment Sync
-  acumaticaPaymentRef  String? // AR Payment reference number from Acumatica (e.g., "PMT001234")
-  acumaticaSyncStatus  String? // "pending", "synced", "failed"
-  acumaticaSyncError   String? // Error message if sync failed
-  acumaticaSyncedAt    DateTime? // When payment was synced to Acumatica
+  acumaticaPaymentRef String? // AR Payment reference number from Acumatica (e.g., "PMT001234")
+  acumaticaSyncStatus String? // "pending", "synced", "failed"
+  acumaticaSyncError  String? // Error message if sync failed
+  acumaticaSyncedAt   DateTime? // When payment was synced to Acumatica
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -527,11 +528,11 @@ model CustomerPayment {
 }
 
 model PaymentApplication {
-  id           String   @id @default(cuid())
-  paymentId    String
-  arDocumentId String
+  id            String   @id @default(cuid())
+  paymentId     String
+  arDocumentId  String
   amountApplied Float
-  createdAt    DateTime @default(now())
+  createdAt     DateTime @default(now())
 
   organizationId String
 
@@ -636,9 +637,9 @@ model AcumaticaIntegration {
   updatedAt DateTime @updatedAt
 
   // Relations
-  organization      Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  customerMappings  AcumaticaCustomerMapping[]
-  syncLogs          IntegrationSyncLog[]
+  organization     Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customerMappings AcumaticaCustomerMapping[]
+  syncLogs         IntegrationSyncLog[]
 
   @@index([organizationId])
   @@map("acumatica_integrations")
@@ -684,12 +685,12 @@ model IntegrationSyncLog {
   triggeredById String? // User ID if manual, null if scheduled
 
   // Counters
-  invoicesFetched    Int @default(0)
-  invoicesProcessed  Int @default(0)
-  invoicesSkipped    Int @default(0)
-  documentsCreated   Int @default(0)
-  customersCreated   Int @default(0)
-  errorsCount        Int @default(0)
+  invoicesFetched   Int @default(0)
+  invoicesProcessed Int @default(0)
+  invoicesSkipped   Int @default(0)
+  documentsCreated  Int @default(0)
+  customersCreated  Int @default(0)
+  errorsCount       Int @default(0)
 
   // Detailed Results
   skipDetails    Json? // Array of {invoiceRef, reason}
@@ -716,24 +717,24 @@ model AuthorizeNetIntegration {
   organizationId String @unique
 
   // API Credentials
-  apiLoginId           String // API Login ID from Authorize.net
+  apiLoginId              String // API Login ID from Authorize.net
   encryptedTransactionKey String // Encrypted Transaction Key
 
   // Environment
   isProduction Boolean @default(false) // false = sandbox, true = production
 
   // Settings
-  enabled              Boolean @default(false)
-  lastConnectionTest   DateTime?
+  enabled                Boolean   @default(false)
+  lastConnectionTest     DateTime?
   connectionErrorMessage String?
 
   // Features
   enableCustomerPayments Boolean @default(true) // Allow customer portal payments
-  enablePaymentLinks    Boolean @default(false) // Future: One-time payment links
-  enableTerminals       Boolean @default(false) // Future: Hardware terminal support
+  enablePaymentLinks     Boolean @default(false) // Future: One-time payment links
+  enableTerminals        Boolean @default(false) // Future: Hardware terminal support
 
   // Transaction Settings
-  requireCVV           Boolean @default(true)
+  requireCVV            Boolean @default(true)
   requireBillingAddress Boolean @default(true)
 
   createdAt DateTime @default(now())
@@ -750,8 +751,8 @@ model StripeIntegration {
   organizationId String @unique
 
   // API Credentials (encrypted)
-  encryptedSecretKey      String  // Encrypted Secret Key (sk_test_... or sk_live_...)
-  encryptedPublishableKey String  // Encrypted Publishable Key (pk_test_... or pk_live_...)
+  encryptedSecretKey      String // Encrypted Secret Key (sk_test_... or sk_live_...)
+  encryptedPublishableKey String // Encrypted Publishable Key (pk_test_... or pk_live_...)
   encryptedWebhookSecret  String? // Optional: Encrypted webhook signing secret
   webhookEndpointId       String? // Stripe webhook endpoint ID (we_...) if auto-created
 
@@ -783,8 +784,8 @@ model StripeIntegration {
 }
 
 model PaymentGatewaySettings {
-  id             String                   @id @default(cuid())
-  organizationId String                   @unique
+  id             String                  @id @default(cuid())
+  organizationId String                  @unique
   activeProvider PaymentGatewayProvider? // null = no active provider
 
   createdAt DateTime @default(now())
