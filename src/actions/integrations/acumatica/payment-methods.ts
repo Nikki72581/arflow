@@ -17,14 +17,15 @@ export interface PaymentMethodInfo {
  * Discover available payment methods from Acumatica
  */
 export async function discoverPaymentMethods(
-  integrationId: string
+  integrationId: string,
 ): Promise<PaymentMethodInfo[]> {
   const user = await getCurrentUser();
   if (!user || user.role !== UserRole.ADMIN) {
     throw new Error("Only administrators can discover payment methods");
   }
 
-  let client: Awaited<ReturnType<typeof createAuthenticatedClient>> | null = null;
+  let client: Awaited<ReturnType<typeof createAuthenticatedClient>> | null =
+    null;
 
   try {
     const integration = await prisma.acumaticaIntegration.findUnique({
@@ -52,7 +53,7 @@ export async function discoverPaymentMethods(
     }
 
     const data = await response.json();
-    const methods = Array.isArray(data) ? data : (data.value || []);
+    const methods = Array.isArray(data) ? data : data.value || [];
 
     console.log(`[Payment Methods] Found ${methods.length} payment methods`);
 
@@ -65,7 +66,7 @@ export async function discoverPaymentMethods(
     }));
 
     // Filter to only active AR payment methods
-    return paymentMethods.filter(pm => pm.isActive && pm.useForAR);
+    return paymentMethods.filter((pm) => pm.isActive && pm.useForAR);
   } catch (error) {
     console.error("[Payment Methods] Error:", error);
     throw error;
@@ -86,7 +87,7 @@ export async function discoverPaymentMethods(
 export async function savePaymentMethodFilter(
   integrationId: string,
   mode: "ALL" | "SELECTED",
-  selectedPaymentMethods: string[]
+  selectedPaymentMethods: string[],
 ): Promise<void> {
   const user = await getCurrentUser();
   if (!user || user.role !== UserRole.ADMIN) {
@@ -105,10 +106,10 @@ export async function savePaymentMethodFilter(
     // Get current filter config
     const currentFilterConfig = (integration.filterConfig as any) || {};
 
-    // Determine the payment method field based on entity type
-    const paymentMethodField = integration.dataSourceEntity === "SalesOrder"
-      ? "PaymentMethod"
-      : "FinancialDetails/PaymentMethod";
+    // Use PaymentMethod field - available at top level for both SalesOrder and SalesInvoice
+    // Note: For SalesInvoice, the PaymentMethod field is directly on the entity
+    // Filtering on nested paths like FinancialDetails/PaymentMethod doesn't work in Acumatica OData
+    const paymentMethodField = "PaymentMethod";
 
     // Update filter config with payment method settings
     const updatedFilterConfig = {
@@ -116,7 +117,8 @@ export async function savePaymentMethodFilter(
       paymentMethod: {
         field: paymentMethodField,
         mode: mode,
-        selectedValues: mode === "SELECTED" ? selectedPaymentMethods : undefined,
+        selectedValues:
+          mode === "SELECTED" ? selectedPaymentMethods : undefined,
       },
     };
 
@@ -139,7 +141,7 @@ export async function savePaymentMethodFilter(
  * Get current payment method filter configuration
  */
 export async function getPaymentMethodFilter(
-  integrationId: string
+  integrationId: string,
 ): Promise<{ mode: "ALL" | "SELECTED"; selectedValues: string[] } | null> {
   const user = await getCurrentUser();
   if (!user || user.role !== UserRole.ADMIN) {
