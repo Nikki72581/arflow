@@ -17,7 +17,7 @@ export class AcumaticaQueryBuilder {
     dataSourceType: DataSourceType,
     dataSourceEntity: string,
     fieldMappings: FieldMappingConfig,
-    filterConfig: FilterConfig
+    filterConfig: FilterConfig,
   ): string {
     let baseEndpoint = "";
 
@@ -64,7 +64,7 @@ export class AcumaticaQueryBuilder {
     // Add required fields
     fields.push(this.getFieldName(fieldMappings.amount.sourceField));
     fields.push(this.getFieldName(fieldMappings.date.sourceField));
-    fields.push(this.getFieldName(fieldMappings.salesperson.sourceField));
+    fields.push(this.getFieldName(fieldMappings.balance.sourceField));
     fields.push(this.getFieldName(fieldMappings.uniqueId.sourceField));
     fields.push(this.getFieldName(fieldMappings.customer.idField));
 
@@ -94,7 +94,9 @@ export class AcumaticaQueryBuilder {
       if (fieldMappings.lineItem) {
         fields.push(this.getFieldName(fieldMappings.lineItem.idField));
         if (fieldMappings.lineItem.descriptionField) {
-          fields.push(this.getFieldName(fieldMappings.lineItem.descriptionField));
+          fields.push(
+            this.getFieldName(fieldMappings.lineItem.descriptionField),
+          );
         }
         if (fieldMappings.lineItem.classField) {
           fields.push(this.getFieldName(fieldMappings.lineItem.classField));
@@ -132,7 +134,7 @@ export class AcumaticaQueryBuilder {
     // Check all field mappings for nested fields
     addExpand(fieldMappings.amount.sourceField);
     addExpand(fieldMappings.date.sourceField);
-    addExpand(fieldMappings.salesperson.sourceField);
+    addExpand(fieldMappings.balance.sourceField);
     addExpand(fieldMappings.uniqueId.sourceField);
     addExpand(fieldMappings.customer.idField);
 
@@ -188,7 +190,7 @@ export class AcumaticaQueryBuilder {
    */
   static buildFilterClause(
     filterConfig: FilterConfig,
-    fieldMappings: FieldMappingConfig
+    fieldMappings: FieldMappingConfig,
   ): string {
     const filters: string[] = [];
 
@@ -202,7 +204,10 @@ export class AcumaticaQueryBuilder {
     }
 
     // Document type filter
-    if (filterConfig.documentType && filterConfig.documentType.allowedValues.length > 0) {
+    if (
+      filterConfig.documentType &&
+      filterConfig.documentType.allowedValues.length > 0
+    ) {
       const typeFilters = filterConfig.documentType.allowedValues
         .map((type) => `${filterConfig.documentType!.field} eq '${type}'`)
         .join(" or ");
@@ -212,14 +217,21 @@ export class AcumaticaQueryBuilder {
 
     // Date range filter (required)
     const dateField = filterConfig.dateRange.field;
-    filters.push(`${dateField} ge datetime'${filterConfig.dateRange.startDate}'`);
+    filters.push(
+      `${dateField} ge datetime'${filterConfig.dateRange.startDate}'`,
+    );
 
     if (filterConfig.dateRange.endDate) {
-      filters.push(`${dateField} le datetime'${filterConfig.dateRange.endDate}'`);
+      filters.push(
+        `${dateField} le datetime'${filterConfig.dateRange.endDate}'`,
+      );
     }
 
     // Branch filter
-    if (filterConfig.branch?.mode === "SELECTED" && filterConfig.branch.selectedValues?.length) {
+    if (
+      filterConfig.branch?.mode === "SELECTED" &&
+      filterConfig.branch.selectedValues?.length
+    ) {
       const branchFilters = filterConfig.branch.selectedValues
         .map((branch) => `${filterConfig.branch!.field} eq '${branch}'`)
         .join(" or ");
@@ -320,14 +332,14 @@ export class AcumaticaQueryBuilder {
     dataSourceEntity: string,
     fieldMappings: FieldMappingConfig,
     filterConfig: FilterConfig,
-    limit: number = 10
+    limit: number = 10,
   ): string {
     const baseQuery = this.buildQuery(
       apiVersion,
       dataSourceType,
       dataSourceEntity,
       fieldMappings,
-      filterConfig
+      filterConfig,
     );
 
     // Add $top parameter for limiting results
@@ -343,7 +355,7 @@ export class AcumaticaQueryBuilder {
     dataSourceType: DataSourceType,
     dataSourceEntity: string,
     filterConfig: FilterConfig,
-    fieldMappings: FieldMappingConfig
+    fieldMappings: FieldMappingConfig,
   ): string {
     let baseEndpoint = "";
 
@@ -408,8 +420,8 @@ export class AcumaticaQueryBuilder {
       errors.push("Date field mapping is required");
     }
 
-    if (!fieldMappings.salesperson?.sourceField) {
-      errors.push("Salesperson field mapping is required");
+    if (!fieldMappings.balance?.sourceField) {
+      errors.push("Balance field mapping is required");
     }
 
     if (!fieldMappings.uniqueId?.sourceField) {
@@ -427,7 +439,9 @@ export class AcumaticaQueryBuilder {
     // Check line-level specific requirements
     if (fieldMappings.importLevel === "LINE_LEVEL") {
       if (!fieldMappings.lineAmount?.sourceField) {
-        errors.push("Line amount field mapping is required for line-level imports");
+        errors.push(
+          "Line amount field mapping is required for line-level imports",
+        );
       }
     }
 
@@ -451,7 +465,10 @@ export class AcumaticaQueryBuilder {
       errors.push("Status filter field is required");
     }
 
-    if (!filterConfig.status?.allowedValues || filterConfig.status.allowedValues.length === 0) {
+    if (
+      !filterConfig.status?.allowedValues ||
+      filterConfig.status.allowedValues.length === 0
+    ) {
       errors.push("At least one status value must be allowed");
     }
 

@@ -10,21 +10,16 @@ This directory contains the integration code for connecting ARFlow to Acumatica 
 
 This integration was built specifically against Acumatica version 2025 R1. Different versions of Acumatica may have:
 
-- **Different field availability** - Some endpoints may not have certain fields (e.g., `Email` on `Salesperson`)
+- **Different field availability** - Some endpoints may not have certain fields
 - **Different OData capabilities** - Filter and select query support may vary
 - **Different data structures** - Field names, types, or response formats may change
 - **Different API behaviors** - Authentication, session management, or endpoint behavior may differ
 
 ### Known Version-Specific Issues
 
-1. **Salesperson Email Field**: Not all Acumatica versions include the `Email` field on the Salesperson endpoint. The client includes fallback logic to handle this gracefully.
+1. **IsActive Filtering**: Some versions may not support OData filtering on the `IsActive` field.
 
-2. **IsActive Filtering**: Some versions may not support OData filtering on the `IsActive` field. The client attempts multiple strategies:
-   - First attempt: `$filter=IsActive eq true` with Email field
-   - Second attempt: `$filter=IsActive eq true` without Email field
-   - Fallback: Fetch all salespeople and filter locally
-
-3. **API Version Compatibility**: The integration supports API versions from 23.200.001 to 25.100.001, but testing was primarily done on 24.200.001 and 25.100.001.
+2. **API Version Compatibility**: The integration supports API versions from 23.200.001 to 25.100.001, but testing was primarily done on 24.200.001 and 25.100.001.
 
 ## Integration Architecture
 
@@ -33,15 +28,33 @@ This integration was built specifically against Acumatica version 2025 R1. Diffe
 - **`client.ts`** - Main Acumatica API client with authentication and HTTP methods
 - **`types.ts`** - TypeScript type definitions for Acumatica entities
 - **`crypto.ts`** - Credential encryption/decryption utilities
+- **`schema-discovery.ts`** - Default field mappings for SalesOrder and SalesInvoice
+- **`field-extractor.ts`** - Extracts data from Acumatica records based on field mappings
 
 ### Supported Endpoints
 
-- **Salesperson** - For mapping salespeople to ARFlow users
-- **SalesInvoice** - For importing sales transactions and calculating commissions
+- **SalesInvoice** - For importing sales invoices with amount and balance
+- **SalesOrder** - For importing sales orders with amount and balance
 - **Customer** - For customer data synchronization
-- **Project** - For project-based commission tracking
+- **Project** - For project-based tracking
 - **Branch** - For multi-branch organization support
-- **ItemClass** - For product categorization in commission rules
+- **ItemClass** - For product categorization
+
+## Document Type Selection
+
+The integration supports three document type configurations:
+
+1. **Sales Orders Only** - Collects payments on SalesOrder documents
+   - Amount field: `OrderTotal`
+   - Balance field: `UnpaidBalance`
+   - Unique ID: `OrderNbr`
+
+2. **Sales Invoices Only** - Collects payments on SalesInvoice documents
+   - Amount field: `Amount`
+   - Balance field: `Balance`
+   - Unique ID: `ReferenceNbr`
+
+3. **Both** - Collects payments on both document types (Sales Orders as primary)
 
 ## Testing Against Different Versions
 
@@ -49,8 +62,8 @@ If you need to connect to a different Acumatica version:
 
 1. **Verify Endpoint Availability**
    ```bash
-   # Test the Salesperson endpoint
-   GET https://your-instance.acumatica.com/entity/Default/25.100.001/Salesperson
+   # Test the Customer endpoint
+   GET https://your-instance.acumatica.com/entity/Default/25.100.001/Customer
 
    # Check available fields
    GET https://your-instance.acumatica.com/entity/Default/25.100.001/$metadata
@@ -59,10 +72,10 @@ If you need to connect to a different Acumatica version:
 2. **Test OData Queries**
    ```bash
    # Test filtering
-   GET https://your-instance.acumatica.com/entity/Default/25.100.001/Salesperson?$filter=IsActive eq true
+   GET https://your-instance.acumatica.com/entity/Default/25.100.001/SalesInvoice?$filter=Status eq 'Open'
 
    # Test field selection
-   GET https://your-instance.acumatica.com/entity/Default/25.100.001/Salesperson?$select=SalespersonID,Name,Email
+   GET https://your-instance.acumatica.com/entity/Default/25.100.001/SalesInvoice?$select=ReferenceNbr,Amount,Balance
    ```
 
 3. **Verify Authentication**
@@ -74,27 +87,6 @@ If you need to connect to a different Acumatica version:
    - If field structures differ, update `types.ts`
    - Add new fallback logic in `client.ts` if needed
    - Update tests to reflect new behavior
-
-## Multi-Tier Fallback Strategy
-
-The integration uses a multi-tier fallback approach to handle version differences gracefully:
-
-```typescript
-try {
-  // Attempt 1: Best case scenario with all fields
-  return await fetchWithAllFields();
-} catch (error) {
-  // Attempt 2: Fallback without optional fields
-  try {
-    return await fetchWithReducedFields();
-  } catch (retryError) {
-    // Attempt 3: Last resort with local filtering
-    return await fetchAllAndFilterLocally();
-  }
-}
-```
-
-This ensures the integration continues working even when some features aren't available in the connected Acumatica version.
 
 ## Future Considerations
 

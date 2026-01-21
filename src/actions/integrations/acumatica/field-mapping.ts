@@ -23,7 +23,7 @@ import { revalidatePath } from "next/cache";
  */
 export async function saveFieldMappings(
   integrationId: string,
-  fieldMappings: FieldMappingConfig
+  fieldMappings: FieldMappingConfig,
 ): Promise<void> {
   const user = await getCurrentUser();
   if (!user || user.role !== UserRole.ADMIN) {
@@ -62,7 +62,7 @@ export async function saveFieldMappings(
  * Get current field mappings
  */
 export async function getFieldMappings(
-  integrationId: string
+  integrationId: string,
 ): Promise<FieldMappingConfig | null> {
   const user = await getCurrentUser();
   if (!user || user.role !== UserRole.ADMIN) {
@@ -88,7 +88,7 @@ export async function getFieldMappings(
  * Auto-suggest field mappings based on field names
  */
 export async function autoSuggestFieldMappings(
-  integrationId: string
+  integrationId: string,
 ): Promise<AutoSuggestResult> {
   const user = await getCurrentUser();
   if (!user || user.role !== UserRole.ADMIN) {
@@ -121,6 +121,7 @@ export async function autoSuggestFieldMappings(
     // Amount field
     const amountField = findBestMatch(fields, [
       "Amount",
+      "OrderTotal",
       "DocTotal",
       "Total",
       "InvoiceAmount",
@@ -134,28 +135,33 @@ export async function autoSuggestFieldMappings(
       };
     }
 
+    // Balance field
+    const balanceField = findBestMatch(fields, [
+      "Balance",
+      "UnpaidBalance",
+      "BalanceDue",
+      "OpenBalance",
+    ]);
+    if (balanceField) {
+      suggestions.balance = {
+        sourceField: balanceField.name,
+        confidence: balanceField.confidence,
+        reason: `Matched common balance field name: ${balanceField.name}`,
+      };
+    }
+
     // Date field
-    const dateField = findBestMatch(fields, ["Date", "DocDate", "InvoiceDate", "TransactionDate"]);
+    const dateField = findBestMatch(fields, [
+      "Date",
+      "DocDate",
+      "InvoiceDate",
+      "TransactionDate",
+    ]);
     if (dateField) {
       suggestions.date = {
         sourceField: dateField.name,
         confidence: dateField.confidence,
         reason: `Matched common date field name: ${dateField.name}`,
-      };
-    }
-
-    // Salesperson field
-    const salespersonField = findBestMatch(fields, [
-      "Commissions/SalesPersons/SalespersonID",
-      "SalespersonID",
-      "Salesperson",
-      "Details/SalespersonID",
-    ]);
-    if (salespersonField) {
-      suggestions.salesperson = {
-        sourceField: salespersonField.name,
-        confidence: salespersonField.confidence,
-        reason: `Matched common salesperson field: ${salespersonField.name}`,
       };
     }
 
@@ -191,7 +197,11 @@ export async function autoSuggestFieldMappings(
     }
 
     // Project field
-    const projectField = findBestMatch(fields, ["Project", "ProjectID", "ProjectCode"]);
+    const projectField = findBestMatch(fields, [
+      "Project",
+      "ProjectID",
+      "ProjectCode",
+    ]);
     if (projectField) {
       suggestions.project = {
         sourceField: projectField.name,
@@ -212,7 +222,7 @@ export async function autoSuggestFieldMappings(
  */
 function findBestMatch(
   fields: FieldInfo[],
-  candidates: string[]
+  candidates: string[],
 ): { name: string; confidence: "high" | "medium" | "low" } | null {
   // Try exact matches first
   for (const candidate of candidates) {
@@ -225,7 +235,7 @@ function findBestMatch(
   // Try case-insensitive matches
   for (const candidate of candidates) {
     const caseInsensitiveMatch = fields.find(
-      (f) => f.name.toLowerCase() === candidate.toLowerCase()
+      (f) => f.name.toLowerCase() === candidate.toLowerCase(),
     );
     if (caseInsensitiveMatch) {
       return { name: caseInsensitiveMatch.name, confidence: "high" };
@@ -235,7 +245,7 @@ function findBestMatch(
   // Try partial matches (contains)
   for (const candidate of candidates) {
     const partialMatch = fields.find((f) =>
-      f.name.toLowerCase().includes(candidate.toLowerCase())
+      f.name.toLowerCase().includes(candidate.toLowerCase()),
     );
     if (partialMatch) {
       return { name: partialMatch.name, confidence: "medium" };
@@ -245,7 +255,7 @@ function findBestMatch(
   // Try reverse partial match (candidate contains field name)
   for (const candidate of candidates) {
     const reverseMatch = fields.find((f) =>
-      candidate.toLowerCase().includes(f.name.toLowerCase())
+      candidate.toLowerCase().includes(f.name.toLowerCase()),
     );
     if (reverseMatch) {
       return { name: reverseMatch.name, confidence: "low" };
@@ -259,7 +269,7 @@ function findBestMatch(
  * Validate field mappings
  */
 export async function validateFieldMappings(
-  fieldMappings: FieldMappingConfig
+  fieldMappings: FieldMappingConfig,
 ): Promise<{ valid: boolean; errors: string[] }> {
   const errors: string[] = [];
 
@@ -268,12 +278,12 @@ export async function validateFieldMappings(
     errors.push("Amount field mapping is required");
   }
 
-  if (!fieldMappings.date?.sourceField) {
-    errors.push("Date field mapping is required");
+  if (!fieldMappings.balance?.sourceField) {
+    errors.push("Balance field mapping is required");
   }
 
-  if (!fieldMappings.salesperson?.sourceField) {
-    errors.push("Salesperson field mapping is required");
+  if (!fieldMappings.date?.sourceField) {
+    errors.push("Date field mapping is required");
   }
 
   if (!fieldMappings.uniqueId?.sourceField) {
@@ -291,7 +301,9 @@ export async function validateFieldMappings(
   // Check line-level specific requirements
   if (fieldMappings.importLevel === "LINE_LEVEL") {
     if (!fieldMappings.lineAmount?.sourceField) {
-      errors.push("Line amount field mapping is required for line-level imports");
+      errors.push(
+        "Line amount field mapping is required for line-level imports",
+      );
     }
   }
 

@@ -1,8 +1,8 @@
 /**
- * Acumatica Data Source Discovery Actions
+ * Acumatica Data Source Actions
  *
- * Server actions for discovering and selecting data sources
- * (REST API entities, Generic Inquiries, etc.)
+ * Server actions for configuring document types and data sources.
+ * Simplified to use default REST endpoints with automatic field mapping.
  */
 
 "use server";
@@ -12,13 +12,20 @@ import { getCurrentUser } from "@/lib/session";
 import { UserRole, DataSourceType } from "@prisma/client";
 import { createAuthenticatedClient } from "@/lib/acumatica/auth";
 import { SchemaDiscoveryService } from "@/lib/acumatica/schema-discovery";
-import { EntityInfo, InquiryInfo, DiscoveredSchema } from "@/lib/acumatica/config-types";
+import {
+  EntityInfo,
+  DiscoveredSchema,
+  DocumentTypeSelection,
+  FieldMappingConfig,
+} from "@/lib/acumatica/config-types";
 import { revalidatePath } from "next/cache";
 
 /**
  * Discover available REST API entities
  */
-export async function discoverRestApiEntities(integrationId: string): Promise<EntityInfo[]> {
+export async function discoverRestApiEntities(
+  integrationId: string,
+): Promise<EntityInfo[]> {
   const user = await getCurrentUser();
   if (!user || user.role !== UserRole.ADMIN) {
     throw new Error("Only administrators can discover data sources");
@@ -47,12 +54,15 @@ export async function discoverRestApiEntities(integrationId: string): Promise<En
 }
 
 /**
- * Discover available Generic Inquiries
+ * Select document types for payment collection and auto-configure field mappings
  */
-export async function discoverGenericInquiries(integrationId: string): Promise<InquiryInfo[]> {
+export async function selectDocumentTypes(
+  integrationId: string,
+  documentTypeSelection: DocumentTypeSelection,
+): Promise<void> {
   const user = await getCurrentUser();
   if (!user || user.role !== UserRole.ADMIN) {
-    throw new Error("Only administrators can discover data sources");
+    throw new Error("Only administrators can configure document types");
   }
 
   try {
@@ -67,46 +77,86 @@ export async function discoverGenericInquiries(integrationId: string): Promise<I
     const client = await createAuthenticatedClient(integration);
 
     try {
-      const inquiries = await SchemaDiscoveryService.discoverGenericInquiries(client);
+      // Get entities based on selection
+      const entities = SchemaDiscoveryService.getEntitiesForDocumentType(
+        documentTypeSelection,
+      );
 
-      if (inquiries.length === 0) {
-        console.warn(
-          "[Discover Generic Inquiries] No Generic Inquiries found. " +
-          "Please ensure Generic Inquiry OData is enabled and at least one Generic Inquiry is published."
-        );
-      } else {
-        console.log(`[Discover Generic Inquiries] Found ${inquiries.length} Generic Inquiries`);
-      }
+      // Use the first entity as the primary data source
+      const primaryEntity = entities[0];
 
-      return inquiries;
+      // Build the discovered schema for the primary entity
+      const schema = await SchemaDiscoveryService.buildDiscoveredSchema(
+        client,
+        DataSourceType.REST_API,
+        primaryEntity,
+      );
+
+      // Fetch sample data to enrich schema with examples
+      const sampleData = await SchemaDiscoveryService.getSampleData(
+        client,
+        { type: DataSourceType.REST_API, entity: primaryEntity },
+        5,
+      );
+
+      // Enrich fields with sample values
+      const enrichedSchema = {
+        ...schema,
+        fields: SchemaDiscoveryService.enrichFieldsWithSamples(
+          schema.fields,
+          sampleData,
+        ),
+      };
+
+      // Get default field mappings for the primary entity
+      const fieldMappings = SchemaDiscoveryService.getDefaultFieldMappings(
+        documentTypeSelection,
+        primaryEntity,
+      );
+
+      // Update the integration with document type selection, schema, and field mappings
+      await prisma.acumaticaIntegration.update({
+        where: { id: integrationId },
+        data: {
+          dataSourceType: DataSourceType.REST_API,
+          dataSourceEntity: primaryEntity,
+          dataSourceEndpoint: schema.endpoint,
+          discoveredSchema: enrichedSchema as any,
+          schemaLastUpdated: new Date(),
+          fieldMappings: fieldMappings as any,
+        },
+      });
+
+      revalidatePath("/dashboard/integrations/acumatica/setup");
     } finally {
       await client.logout();
     }
   } catch (error) {
-    console.error("[Discover Generic Inquiries] Error:", error);
-
-    // Provide helpful error message based on the error type
-    if (error instanceof Error) {
-      // Log the full error for debugging
-      console.error("[Discover Generic Inquiries] Full error details:", {
-        message: error.message,
-        stack: error.stack,
-      });
-    }
-
-    // Return empty array on error (GI might not be configured)
-    // The UI will handle displaying appropriate messages to the user
-    return [];
+    console.error("[Select Document Types] Error:", error);
+    throw error;
   }
 }
 
 /**
- * Select a data source and fetch its schema
+ * Get default field mappings for a document type
+ */
+export async function getDefaultFieldMappings(
+  documentTypeSelection: DocumentTypeSelection,
+  entityName: "SalesOrder" | "SalesInvoice",
+): Promise<FieldMappingConfig> {
+  return SchemaDiscoveryService.getDefaultFieldMappings(
+    documentTypeSelection,
+    entityName,
+  );
+}
+
+/**
+ * Select a data source and fetch its schema (legacy - kept for compatibility)
  */
 export async function selectDataSource(
   integrationId: string,
   dataSourceType: DataSourceType,
-  entityName: string
+  entityName: string,
 ): Promise<void> {
   const user = await getCurrentUser();
   if (!user || user.role !== UserRole.ADMIN) {
@@ -129,20 +179,23 @@ export async function selectDataSource(
       const schema = await SchemaDiscoveryService.buildDiscoveredSchema(
         client,
         dataSourceType,
-        entityName
+        entityName,
       );
 
       // Fetch sample data to enrich schema with examples
       const sampleData = await SchemaDiscoveryService.getSampleData(
         client,
         { type: dataSourceType, entity: entityName },
-        5
+        5,
       );
 
       // Enrich fields with sample values
       const enrichedSchema = {
         ...schema,
-        fields: SchemaDiscoveryService.enrichFieldsWithSamples(schema.fields, sampleData),
+        fields: SchemaDiscoveryService.enrichFieldsWithSamples(
+          schema.fields,
+          sampleData,
+        ),
       };
 
       // Update the integration
@@ -193,7 +246,7 @@ export async function refreshSchema(integrationId: string): Promise<void> {
     await selectDataSource(
       integrationId,
       integration.dataSourceType,
-      integration.dataSourceEntity
+      integration.dataSourceEntity,
     );
   } catch (error) {
     console.error("[Refresh Schema] Error:", error);
@@ -204,7 +257,9 @@ export async function refreshSchema(integrationId: string): Promise<void> {
 /**
  * Get the discovered schema for an integration
  */
-export async function getDiscoveredSchema(integrationId: string): Promise<DiscoveredSchema | null> {
+export async function getDiscoveredSchema(
+  integrationId: string,
+): Promise<DiscoveredSchema | null> {
   const user = await getCurrentUser();
   if (!user || user.role !== UserRole.ADMIN) {
     throw new Error("Only administrators can view schemas");

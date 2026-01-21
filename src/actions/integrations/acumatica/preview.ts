@@ -26,7 +26,7 @@ import {
  */
 export async function previewAcumaticaData(
   integrationId: string,
-  limit: number = 10
+  limit: number = 10,
 ): Promise<PreviewDataResponse> {
   const user = await getCurrentUser();
   if (!user || user.role !== UserRole.ADMIN) {
@@ -51,7 +51,8 @@ export async function previewAcumaticaData(
     }
 
     // Validate field mappings and filter config
-    const fieldMappings = integration.fieldMappings as FieldMappingConfig | null;
+    const fieldMappings =
+      integration.fieldMappings as FieldMappingConfig | null;
     const filterConfig = integration.filterConfig as FilterConfig | null;
 
     if (!fieldMappings || !isValidFieldMapping(fieldMappings)) {
@@ -73,15 +74,16 @@ export async function previewAcumaticaData(
         integration.dataSourceEntity,
         fieldMappings,
         filterConfig,
-        limit
+        limit,
       );
 
       console.log("[Preview] Query:", query);
 
       // Fetch sample data
       // Generic Inquiry and DAC OData endpoints require Basic Auth instead of session cookies
-      const useBasicAuth = integration.dataSourceType === "GENERIC_INQUIRY" ||
-                          integration.dataSourceType === "DAC_ODATA";
+      const useBasicAuth =
+        integration.dataSourceType === "GENERIC_INQUIRY" ||
+        integration.dataSourceType === "DAC_ODATA";
 
       const response = useBasicAuth
         ? await client.makeBasicAuthRequest("GET", query)
@@ -89,7 +91,7 @@ export async function previewAcumaticaData(
 
       if (!response.ok) {
         throw new Error(
-          `Failed to fetch preview data: ${response.status} ${response.statusText}`
+          `Failed to fetch preview data: ${response.status} ${response.statusText}`,
         );
       }
 
@@ -99,20 +101,22 @@ export async function previewAcumaticaData(
       console.log(`[Preview] Fetched ${records.length} records`);
 
       // Extract and validate data
-      const extractedRecords = records.map((record: any) => {
-        try {
-          return FieldExtractor.extractInvoiceData(record, fieldMappings);
-        } catch (error) {
-          console.error("[Preview] Error extracting record:", error);
-          return null;
-        }
-      }).filter(Boolean);
+      const extractedRecords = records
+        .map((record: any) => {
+          try {
+            return FieldExtractor.extractInvoiceData(record, fieldMappings);
+          } catch (error) {
+            console.error("[Preview] Error extracting record:", error);
+            return null;
+          }
+        })
+        .filter(Boolean);
 
       // Perform validation
       const validation = await validatePreviewData(
         extractedRecords,
         integration.customerMappings,
-        integration.unmappedCustomerAction
+        integration.unmappedCustomerAction,
       );
 
       return {
@@ -135,12 +139,12 @@ export async function previewAcumaticaData(
 async function validatePreviewData(
   records: any[],
   customerMappings: any[],
-  unmappedAction: string
+  unmappedAction: string,
 ): Promise<PreviewValidation> {
   const validation: PreviewValidation = {
     totalRecords: records.length,
     readyToImport: 0,
-    unmappedSalespeople: [],
+    unmappedCustomers: [],
     missingRequired: [],
     warnings: [],
     errors: [],
@@ -163,7 +167,10 @@ async function validatePreviewData(
 
     // Check required fields
     if (!record.amount || record.amount === 0) {
-      missingFieldCounts.set("amount", (missingFieldCounts.get("amount") || 0) + 1);
+      missingFieldCounts.set(
+        "amount",
+        (missingFieldCounts.get("amount") || 0) + 1,
+      );
       hasIssue = true;
     }
 
@@ -173,12 +180,18 @@ async function validatePreviewData(
     }
 
     if (!record.uniqueId) {
-      missingFieldCounts.set("uniqueId", (missingFieldCounts.get("uniqueId") || 0) + 1);
+      missingFieldCounts.set(
+        "uniqueId",
+        (missingFieldCounts.get("uniqueId") || 0) + 1,
+      );
       hasIssue = true;
     }
 
     if (!record.customerId) {
-      missingFieldCounts.set("customerId", (missingFieldCounts.get("customerId") || 0) + 1);
+      missingFieldCounts.set(
+        "customerId",
+        (missingFieldCounts.get("customerId") || 0) + 1,
+      );
       hasIssue = true;
     } else {
       const isMapped = customerMap.get(record.customerId);
@@ -187,7 +200,7 @@ async function validatePreviewData(
         // Customer exists in Acumatica but not mapped in ARFlow
         unmappedCustomerCounts.set(
           record.customerId,
-          (unmappedCustomerCounts.get(record.customerId) || 0) + 1
+          (unmappedCustomerCounts.get(record.customerId) || 0) + 1,
         );
 
         if (unmappedAction === "SKIP") {
@@ -202,36 +215,36 @@ async function validatePreviewData(
   }
 
   // Populate validation results
-  validation.unmappedSalespeople = Array.from(unmappedCustomerCounts.entries()).map(
-    ([customerId, count]) => ({
-      salespersonId: customerId,
-      count,
-    })
-  );
+  validation.unmappedCustomers = Array.from(
+    unmappedCustomerCounts.entries(),
+  ).map(([customerId, count]) => ({
+    customerId,
+    count,
+  }));
 
   validation.missingRequired = Array.from(missingFieldCounts.entries()).map(
     ([field, count]) => ({
       field,
       count,
-    })
+    }),
   );
 
   // Generate warnings
-  if (validation.unmappedSalespeople.length > 0) {
+  if (validation.unmappedCustomers.length > 0) {
     if (unmappedAction === "SKIP") {
       validation.warnings.push(
-        `${validation.totalRecords - validation.readyToImport} records will be skipped due to unmapped customers`
+        `${validation.totalRecords - validation.readyToImport} records will be skipped due to unmapped customers`,
       );
     } else {
       validation.warnings.push(
-        `${validation.unmappedSalespeople.reduce((sum, s) => sum + s.count, 0)} records have unmapped customers and will be assigned to default customer`
+        `${validation.unmappedCustomers.reduce((sum, c) => sum + c.count, 0)} records have unmapped customers and will be assigned to default customer`,
       );
     }
   }
 
   if (validation.missingRequired.length > 0) {
     validation.errors.push(
-      `Some records are missing required fields: ${validation.missingRequired.map((m) => m.field).join(", ")}`
+      `Some records are missing required fields: ${validation.missingRequired.map((m) => m.field).join(", ")}`,
     );
   }
 
@@ -241,7 +254,9 @@ async function validatePreviewData(
 /**
  * Get total record count for the current filter configuration
  */
-export async function getAcumaticaRecordCount(integrationId: string): Promise<number> {
+export async function getAcumaticaRecordCount(
+  integrationId: string,
+): Promise<number> {
   const user = await getCurrentUser();
   if (!user || user.role !== UserRole.ADMIN) {
     throw new Error("Only administrators can access Acumatica data");
@@ -260,11 +275,14 @@ export async function getAcumaticaRecordCount(integrationId: string): Promise<nu
       throw new Error("Integration not found");
     }
 
-    const fieldMappings = integration.fieldMappings as FieldMappingConfig | null;
+    const fieldMappings =
+      integration.fieldMappings as FieldMappingConfig | null;
     const filterConfig = integration.filterConfig as FilterConfig | null;
 
     if (!fieldMappings || !filterConfig) {
-      throw new Error("Field mappings and filter configuration must be set first");
+      throw new Error(
+        "Field mappings and filter configuration must be set first",
+      );
     }
 
     const client = await createAuthenticatedClient(integration);
@@ -275,12 +293,13 @@ export async function getAcumaticaRecordCount(integrationId: string): Promise<nu
         integration.dataSourceType,
         integration.dataSourceEntity,
         filterConfig,
-        fieldMappings
+        fieldMappings,
       );
 
       // Generic Inquiry and DAC OData endpoints require Basic Auth instead of session cookies
-      const useBasicAuth = integration.dataSourceType === "GENERIC_INQUIRY" ||
-                          integration.dataSourceType === "DAC_ODATA";
+      const useBasicAuth =
+        integration.dataSourceType === "GENERIC_INQUIRY" ||
+        integration.dataSourceType === "DAC_ODATA";
 
       const response = useBasicAuth
         ? await client.makeBasicAuthRequest("GET", countQuery)
@@ -293,7 +312,9 @@ export async function getAcumaticaRecordCount(integrationId: string): Promise<nu
       const count = await response.json();
 
       // The response might be a number or an object with a value
-      return typeof count === "number" ? count : parseInt(count.value || count["@odata.count"] || "0");
+      return typeof count === "number"
+        ? count
+        : parseInt(count.value || count["@odata.count"] || "0");
     } finally {
       await client.logout();
     }
@@ -306,7 +327,9 @@ export async function getAcumaticaRecordCount(integrationId: string): Promise<nu
 /**
  * Validate field mappings and filter configuration
  */
-export async function validateIntegrationConfig(integrationId: string): Promise<{
+export async function validateIntegrationConfig(
+  integrationId: string,
+): Promise<{
   fieldMappingsValid: boolean;
   filterConfigValid: boolean;
   fieldMappingErrors: string[];

@@ -8,13 +8,17 @@
 import { DataSourceType } from "@prisma/client";
 
 // ============================================
-// Field Mapping Configuration
+// Document Type Selection
 // ============================================
 
 /**
- * Salesperson location in the data structure
+ * Which document types to collect payments on
  */
-export type SalespersonLevel = "header" | "line" | "detail_tab";
+export type DocumentTypeSelection = "SALES_ORDERS" | "SALES_INVOICES" | "BOTH";
+
+// ============================================
+// Field Mapping Configuration
+// ============================================
 
 /**
  * Field type information from Acumatica
@@ -35,7 +39,12 @@ export type AcumaticaFieldType =
 export interface FieldMappingConfig {
   // Required mappings
   amount: {
-    sourceField: string; // e.g., "Amount" or "custom/UsrNetAmount"
+    sourceField: string; // e.g., "Amount", "OrderTotal", or "custom/UsrNetAmount"
+    sourceType: AcumaticaFieldType;
+  };
+
+  balance: {
+    sourceField: string; // e.g., "Balance" or "UnpaidBalance"
     sourceType: AcumaticaFieldType;
   };
 
@@ -44,13 +53,8 @@ export interface FieldMappingConfig {
     sourceType: "date" | "datetime";
   };
 
-  salesperson: {
-    sourceField: string; // e.g., "SalespersonID" or "Commissions/SalesPersons/SalespersonID"
-    sourceLevel: SalespersonLevel;
-  };
-
   uniqueId: {
-    sourceField: string; // e.g., "ReferenceNbr"
+    sourceField: string; // e.g., "ReferenceNbr" or "OrderNbr"
     compositeFields?: string[]; // e.g., ["Type", "ReferenceNbr"] for composite key
   };
 
@@ -102,7 +106,15 @@ export interface FieldMappingConfig {
 /**
  * Filter operator types
  */
-export type FilterOperator = "eq" | "ne" | "gt" | "lt" | "ge" | "le" | "in" | "contains";
+export type FilterOperator =
+  | "eq"
+  | "ne"
+  | "gt"
+  | "lt"
+  | "ge"
+  | "le"
+  | "in"
+  | "contains";
 
 /**
  * Complete filter configuration
@@ -218,9 +230,9 @@ export interface PreviewValidation {
   readyToImport: number;
 
   // Issues
-  unmappedSalespeople: Array<{
-    salespersonId: string;
-    salespersonName?: string;
+  unmappedCustomers: Array<{
+    customerId: string;
+    customerName?: string;
     count: number;
   }>;
 
@@ -260,8 +272,8 @@ export interface FieldSuggestion {
  */
 export interface AutoSuggestResult {
   amount?: FieldSuggestion;
+  balance?: FieldSuggestion;
   date?: FieldSuggestion;
-  salesperson?: FieldSuggestion;
   uniqueId?: FieldSuggestion;
   customer?: FieldSuggestion;
   project?: FieldSuggestion;
@@ -279,8 +291,8 @@ export function isValidFieldMapping(config: any): config is FieldMappingConfig {
     config &&
     typeof config === "object" &&
     config.amount?.sourceField &&
+    config.balance?.sourceField &&
     config.date?.sourceField &&
-    config.salesperson?.sourceField &&
     config.uniqueId?.sourceField &&
     config.customer?.idField &&
     ["INVOICE_TOTAL", "LINE_LEVEL"].includes(config.importLevel)
@@ -304,7 +316,9 @@ export function isValidFilterConfig(config: any): config is FilterConfig {
 /**
  * Check if a discovered schema is valid
  */
-export function isValidDiscoveredSchema(schema: any): schema is DiscoveredSchema {
+export function isValidDiscoveredSchema(
+  schema: any,
+): schema is DiscoveredSchema {
   return (
     schema &&
     typeof schema === "object" &&

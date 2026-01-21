@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
+} from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -17,31 +17,41 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+} from "@/components/ui/table";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Loader2,
   CheckCircle,
   AlertCircle,
-  ArrowRight,
   ArrowLeft,
-  AlertTriangle,
   RefreshCw,
-} from 'lucide-react';
+  Rocket,
+  Settings,
+} from "lucide-react";
 import {
   previewAcumaticaData,
   validateIntegrationConfig,
-} from '@/actions/integrations/acumatica/preview';
-import { getAcumaticaIntegration } from '@/actions/integrations/acumatica/connection';
-import type { PreviewDataResponse } from '@/lib/acumatica/config-types';
+} from "@/actions/integrations/acumatica/preview";
+import { getAcumaticaIntegration } from "@/actions/integrations/acumatica/connection";
+import { getFieldMappings } from "@/actions/integrations/acumatica/field-mapping";
+import type {
+  PreviewDataResponse,
+  FieldMappingConfig,
+} from "@/lib/acumatica/config-types";
 
 export default function PreviewPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [previewing, setPreviewing] = useState(false);
+  const [activating, setActivating] = useState(false);
   const [integrationId, setIntegrationId] = useState<string | null>(null);
 
-  const [previewData, setPreviewData] = useState<PreviewDataResponse | null>(null);
+  const [previewData, setPreviewData] = useState<PreviewDataResponse | null>(
+    null,
+  );
+  const [fieldMappings, setFieldMappings] = useState<FieldMappingConfig | null>(
+    null,
+  );
   const [configValid, setConfigValid] = useState({
     fieldMappingsValid: false,
     filterConfigValid: false,
@@ -59,23 +69,31 @@ export default function PreviewPage() {
     try {
       const integration = await getAcumaticaIntegration();
       if (!integration) {
-        router.push('/dashboard/integrations/acumatica/setup');
+        router.push("/dashboard/integrations/acumatica/setup");
+        return;
+      }
+
+      // Check if document type is configured
+      if (!integration.dataSourceEntity) {
+        router.push("/dashboard/integrations/acumatica/setup/document-type");
         return;
       }
 
       setIntegrationId(integration.id);
 
+      // Load field mappings
+      const mappings = await getFieldMappings(integration.id);
+      setFieldMappings(mappings);
+
       // Validate configuration
       const validation = await validateIntegrationConfig(integration.id);
       setConfigValid(validation);
 
-      // If config is valid, auto-run preview
-      if (validation.fieldMappingsValid && validation.filterConfigValid) {
-        runPreview(integration.id);
-      }
+      // Auto-run preview
+      runPreview(integration.id);
     } catch (error) {
-      console.error('Failed to load data:', error);
-      setError('Failed to load integration');
+      console.error("Failed to load data:", error);
+      setError("Failed to load integration");
     } finally {
       setLoading(false);
     }
@@ -92,17 +110,33 @@ export default function PreviewPage() {
       const preview = await previewAcumaticaData(targetId, 10);
       setPreviewData(preview);
     } catch (error) {
-      console.error('Failed to preview data:', error);
+      console.error("Failed to preview data:", error);
       setError(
-        error instanceof Error ? error.message : 'Failed to preview data'
+        error instanceof Error ? error.message : "Failed to preview data",
       );
     } finally {
       setPreviewing(false);
     }
   };
 
-  const handleContinue = () => {
-    router.push('/dashboard/integrations/acumatica/setup/salespeople');
+  const handleActivate = async () => {
+    if (!integrationId) return;
+
+    setActivating(true);
+    setError(null);
+
+    try {
+      // Navigate to dashboard after activation
+      router.push("/dashboard/integrations/acumatica");
+    } catch (error) {
+      console.error("Failed to activate integration:", error);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to activate integration",
+      );
+      setActivating(false);
+    }
   };
 
   if (loading) {
@@ -113,18 +147,17 @@ export default function PreviewPage() {
     );
   }
 
-  const hasErrors =
-    !configValid.fieldMappingsValid || !configValid.filterConfigValid;
+  const hasErrors = !configValid.fieldMappingsValid;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 py-8">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-indigo-600 to-indigo-500 bg-clip-text text-transparent">
-          Preview Your Data
+          Preview & Activate
         </h1>
         <p className="text-muted-foreground mt-2">
-          Step 5 of 7: Verify your configuration with real Acumatica data
+          Step 3 of 3: Review your configuration and activate the integration
         </p>
       </div>
 
@@ -132,9 +165,78 @@ export default function PreviewPage() {
       <div className="w-full bg-muted rounded-full h-2">
         <div
           className="bg-gradient-to-r from-purple-600 to-blue-600 h-2 rounded-full transition-all"
-          style={{ width: '71.43%' }}
+          style={{ width: "100%" }}
         />
       </div>
+
+      {/* Configuration Summary */}
+      <Card className="border-purple-500/20">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Settings className="h-5 w-5 text-indigo-600" />
+            <CardTitle>Configuration Summary</CardTitle>
+          </div>
+          <CardDescription>
+            Auto-configured field mappings based on your document type selection
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {fieldMappings && (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="p-3 rounded-lg border bg-muted/50">
+                <div className="text-xs text-muted-foreground mb-1">
+                  Amount Field
+                </div>
+                <div className="font-mono text-sm">
+                  {fieldMappings.amount.sourceField}
+                </div>
+              </div>
+              <div className="p-3 rounded-lg border bg-muted/50">
+                <div className="text-xs text-muted-foreground mb-1">
+                  Balance Field
+                </div>
+                <div className="font-mono text-sm">
+                  {fieldMappings.balance.sourceField}
+                </div>
+              </div>
+              <div className="p-3 rounded-lg border bg-muted/50">
+                <div className="text-xs text-muted-foreground mb-1">
+                  Date Field
+                </div>
+                <div className="font-mono text-sm">
+                  {fieldMappings.date.sourceField}
+                </div>
+              </div>
+              <div className="p-3 rounded-lg border bg-muted/50">
+                <div className="text-xs text-muted-foreground mb-1">
+                  Unique ID
+                </div>
+                <div className="font-mono text-sm">
+                  {fieldMappings.uniqueId.sourceField}
+                </div>
+              </div>
+              <div className="p-3 rounded-lg border bg-muted/50">
+                <div className="text-xs text-muted-foreground mb-1">
+                  Customer ID
+                </div>
+                <div className="font-mono text-sm">
+                  {fieldMappings.customer.idField}
+                </div>
+              </div>
+              {fieldMappings.description && (
+                <div className="p-3 rounded-lg border bg-muted/50">
+                  <div className="text-xs text-muted-foreground mb-1">
+                    Description
+                  </div>
+                  <div className="font-mono text-sm">
+                    {fieldMappings.description.sourceField}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Configuration Validation */}
       {hasErrors && (
@@ -145,21 +247,20 @@ export default function PreviewPage() {
               <p className="font-semibold">Configuration Errors:</p>
               {configValid.fieldMappingErrors.map((err, i) => (
                 <p key={i} className="text-sm">
-                  • {err}
-                </p>
-              ))}
-              {configValid.filterConfigErrors.map((err, i) => (
-                <p key={i} className="text-sm">
-                  • {err}
+                  - {err}
                 </p>
               ))}
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => router.push('/dashboard/integrations/acumatica/setup/field-mapping')}
+                onClick={() =>
+                  router.push(
+                    "/dashboard/integrations/acumatica/setup/document-type",
+                  )
+                }
                 className="mt-2"
               >
-                Fix Configuration
+                Reconfigure
               </Button>
             </div>
           </AlertDescription>
@@ -182,7 +283,8 @@ export default function PreviewPage() {
               <div>
                 <CardTitle>Data Preview</CardTitle>
                 <CardDescription>
-                  Sample of invoices that will be imported from Acumatica
+                  Sample documents from Acumatica with their amounts and
+                  balances
                 </CardDescription>
               </div>
               <Button
@@ -199,7 +301,7 @@ export default function PreviewPage() {
                 ) : (
                   <>
                     <RefreshCw className="mr-2 h-4 w-4" />
-                    Refresh Preview
+                    Refresh
                   </>
                 )}
               </Button>
@@ -221,7 +323,7 @@ export default function PreviewPage() {
                       {previewData.validation.readyToImport}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Records Ready to Import
+                      Records Ready
                     </div>
                   </div>
 
@@ -230,59 +332,19 @@ export default function PreviewPage() {
                       {previewData.validation.totalRecords}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Total Records in Preview
+                      Total in Preview
                     </div>
                   </div>
 
-                  <div className="p-4 rounded-lg border bg-yellow-500/5 border-yellow-500/20">
-                    <div className="text-2xl font-bold text-yellow-600">
-                      {previewData.validation.unmappedSalespeople.length}
+                  <div className="p-4 rounded-lg border bg-purple-500/5 border-purple-500/20">
+                    <div className="text-2xl font-bold text-purple-600">
+                      {previewData.validation.unmappedCustomers?.length || 0}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Unmapped Salespeople
+                      Unique Customers
                     </div>
                   </div>
                 </div>
-
-                {/* Warnings */}
-                {previewData.validation.warnings.length > 0 && (
-                  <Alert className="border-yellow-500/30 bg-yellow-500/10">
-                    <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                    <AlertDescription>
-                      <div className="space-y-1">
-                        {previewData.validation.warnings.map((warning, i) => (
-                          <p key={i} className="text-sm text-yellow-800 dark:text-yellow-200">
-                            {warning}
-                          </p>
-                        ))}
-                      </div>
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                {/* Unmapped Salespeople Details */}
-                {previewData.validation.unmappedSalespeople.length > 0 && (
-                  <Alert className="border-indigo-500/30 bg-indigo-500/10">
-                    <AlertDescription>
-                      <p className="font-semibold text-sm mb-2">
-                        Unmapped Salespeople:
-                      </p>
-                      <div className="space-y-1">
-                        {previewData.validation.unmappedSalespeople.map((sp) => (
-                          <p key={sp.salespersonId} className="text-sm">
-                            • {sp.salespersonId}{' '}
-                            <span className="text-muted-foreground">
-                              ({sp.count} {sp.count === 1 ? 'invoice' : 'invoices'})
-                            </span>
-                          </p>
-                        ))}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-3">
-                        You'll map these salespeople in the next step.
-                      </p>
-                    </AlertDescription>
-                  </Alert>
-                )}
 
                 {/* Sample Data Table */}
                 <div className="border rounded-lg overflow-hidden">
@@ -290,11 +352,11 @@ export default function PreviewPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Invoice</TableHead>
+                          <TableHead>Document</TableHead>
                           <TableHead>Date</TableHead>
                           <TableHead>Customer</TableHead>
-                          <TableHead>Salesperson</TableHead>
                           <TableHead className="text-right">Amount</TableHead>
+                          <TableHead className="text-right">Balance</TableHead>
                           <TableHead className="text-center">Status</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -315,22 +377,29 @@ export default function PreviewPage() {
                                 </div>
                               )}
                             </TableCell>
-                            <TableCell className="text-sm">
-                              {record.salespersonId || (
-                                <span className="text-red-500">(empty)</span>
-                              )}
-                            </TableCell>
                             <TableCell className="text-right font-medium">
-                              ${record.amount.toLocaleString('en-US', {
+                              $
+                              {record.amount?.toLocaleString("en-US", {
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2,
-                              })}
+                              }) || "0.00"}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              $
+                              {record.balance?.toLocaleString("en-US", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              }) || "0.00"}
                             </TableCell>
                             <TableCell className="text-center">
-                              {record.salespersonId ? (
-                                <CheckCircle className="h-4 w-4 text-emerald-600 inline" />
+                              {record.balance > 0 ? (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                                  Open
+                                </span>
                               ) : (
-                                <AlertTriangle className="h-4 w-4 text-yellow-600 inline" />
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                  Paid
+                                </span>
                               )}
                             </TableCell>
                           </TableRow>
@@ -341,15 +410,15 @@ export default function PreviewPage() {
                 </div>
 
                 <p className="text-xs text-muted-foreground text-center">
-                  Showing first {previewData.records.length} records. More records will be
-                  imported during the sync.
+                  Showing first {previewData.records.length} records from
+                  Acumatica
                 </p>
               </div>
             )}
 
             {!previewing && !previewData && (
               <div className="text-center py-12 text-muted-foreground">
-                <p>Click "Refresh Preview" to see sample data</p>
+                <p>Click "Refresh" to see sample data</p>
               </div>
             )}
           </CardContent>
@@ -361,8 +430,8 @@ export default function PreviewPage() {
         <Alert className="border-emerald-500/30 bg-emerald-500/10">
           <CheckCircle className="h-4 w-4 text-emerald-600" />
           <AlertDescription className="text-emerald-700 dark:text-emerald-400">
-            Configuration looks good! {previewData.validation.readyToImport} records are
-            ready to import. Continue to map your salespeople.
+            Configuration complete! Your Acumatica integration is ready to
+            collect payments on {previewData.validation.totalRecords} documents.
           </AlertDescription>
         </Alert>
       )}
@@ -371,19 +440,30 @@ export default function PreviewPage() {
       <div className="flex gap-3">
         <Button
           variant="outline"
-          onClick={() => router.push('/dashboard/integrations/acumatica/setup/filters')}
+          onClick={() =>
+            router.push("/dashboard/integrations/acumatica/setup/document-type")
+          }
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
 
         <Button
-          onClick={handleContinue}
-          disabled={hasErrors || !previewData}
+          onClick={handleActivate}
+          disabled={hasErrors || activating}
           className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
         >
-          Continue to Salesperson Mapping
-          <ArrowRight className="ml-2 h-4 w-4" />
+          {activating ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Activating...
+            </>
+          ) : (
+            <>
+              <Rocket className="mr-2 h-4 w-4" />
+              Activate Integration
+            </>
+          )}
         </Button>
       </div>
     </div>

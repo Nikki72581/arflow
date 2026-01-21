@@ -14,9 +14,9 @@ export interface AcumaticaInvoice {
   Date: AcumaticaValue<string>;
   CustomerID: AcumaticaValue<string>;
   Amount: AcumaticaValue<number>;
+  Balance: AcumaticaValue<number>; // Remaining balance due
   DocTotal: AcumaticaValue<number>;
   Details: AcumaticaInvoiceLine[];
-  Commissions?: AcumaticaInvoiceCommissions; // Expanded - contains salesperson data
   FinancialDetails?: AcumaticaInvoiceFinancialDetails; // Expanded - contains branch data
 }
 
@@ -31,30 +31,21 @@ export interface AcumaticaInvoiceLine {
   UnitPrice: AcumaticaValue<number>;
 }
 
-export interface AcumaticaInvoiceCommissions {
-  CommissionAmount?: AcumaticaValue<number>;
-  SalesPersons?: AcumaticaSalesPersonDetail[];
-  TotalCommissionableAmount?: AcumaticaValue<number>;
-}
-
-export interface AcumaticaSalesPersonDetail {
-  CommissionableAmount?: AcumaticaValue<number>;
-  CommissionAmount?: AcumaticaValue<number>;
-  CommissionPercent?: AcumaticaValue<number>;
-  SalespersonID: AcumaticaValue<string>;
-}
-
 export interface AcumaticaInvoiceFinancialDetails {
   BatchNbr?: AcumaticaValue<string>;
   Branch?: AcumaticaValue<string>;
   CustomerTaxZone?: AcumaticaValue<string>;
 }
 
-export interface AcumaticaSalesperson {
-  SalespersonID: AcumaticaValue<string>;
-  Name: AcumaticaValue<string>;
-  Email: AcumaticaValue<string | null>;
-  IsActive: AcumaticaValue<boolean>;
+export interface AcumaticaSalesOrder {
+  OrderNbr: AcumaticaValue<string>;
+  OrderType: AcumaticaValue<string>;
+  Status: AcumaticaValue<string>;
+  Date: AcumaticaValue<string>;
+  CustomerID: AcumaticaValue<string>;
+  OrderTotal: AcumaticaValue<number>;
+  UnpaidBalance: AcumaticaValue<number>; // Remaining balance due
+  Description?: AcumaticaValue<string>;
 }
 
 export interface AcumaticaBranch {

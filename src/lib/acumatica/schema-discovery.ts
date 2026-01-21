@@ -1,8 +1,8 @@
 /**
  * Acumatica Schema Discovery Service
  *
- * Dynamically discovers available entities, fields, and data sources
- * from a specific Acumatica instance.
+ * Simplified schema discovery for REST API entities only.
+ * Provides default field mappings for SalesOrder and SalesInvoice endpoints.
  */
 
 import { AcumaticaClient } from "./client";
@@ -11,11 +11,11 @@ import {
   DiscoveredSchema,
   EntityInfo,
   FieldInfo,
-  InquiryInfo,
   AcumaticaFieldType,
+  FieldMappingConfig,
+  DocumentTypeSelection,
 } from "./config-types";
 import { prisma } from "@/lib/prisma";
-import { enrichRecords } from "./data-enrichment";
 
 // ============================================
 // Schema Discovery Service
@@ -23,40 +23,106 @@ import { enrichRecords } from "./data-enrichment";
 
 export class SchemaDiscoveryService {
   /**
-   * Discover available REST API entities
+   * Discover available REST API entities for payment collection
    */
   static async discoverRestApiEntities(
-    client: AcumaticaClient
+    client: AcumaticaClient,
   ): Promise<EntityInfo[]> {
-    // Standard Acumatica entities commonly used for invoice data
     const standardEntities: EntityInfo[] = [
-      {
-        name: "Invoice",
-        endpoint: `/entity/Default/${client.apiVersion}/Invoice`,
-        displayName: "AR Invoice & Memos",
-        description: "Accounts Receivable invoices and credit/debit memos",
-        screenId: "AR301000",
-      },
       {
         name: "SalesInvoice",
         endpoint: `/entity/Default/${client.apiVersion}/SalesInvoice`,
-        displayName: "Sales Order Invoices",
-        description: "Invoices created from Sales Orders",
+        displayName: "Sales Invoices",
+        description: "Invoices created from Sales Orders with balance tracking",
         screenId: "SO303000",
       },
       {
         name: "SalesOrder",
         endpoint: `/entity/Default/${client.apiVersion}/SalesOrder`,
         displayName: "Sales Orders",
-        description: "Sales Order documents",
+        description: "Sales Order documents with unpaid balance",
         screenId: "SO301000",
       },
     ];
 
-    // TODO: In the future, we could dynamically discover all available entities
-    // by querying the Acumatica metadata endpoint, but for now we use the standard set
-
     return standardEntities;
+  }
+
+  /**
+   * Get default field mappings for a document type selection
+   */
+  static getDefaultFieldMappings(
+    documentTypeSelection: DocumentTypeSelection,
+    entityName: "SalesOrder" | "SalesInvoice",
+  ): FieldMappingConfig {
+    if (entityName === "SalesOrder") {
+      return {
+        importLevel: "INVOICE_TOTAL",
+        amount: {
+          sourceField: "OrderTotal",
+          sourceType: "decimal",
+        },
+        balance: {
+          sourceField: "UnpaidBalance",
+          sourceType: "decimal",
+        },
+        date: {
+          sourceField: "Date",
+          sourceType: "date",
+        },
+        uniqueId: {
+          sourceField: "OrderNbr",
+        },
+        customer: {
+          idField: "CustomerID",
+        },
+        description: {
+          sourceField: "Description",
+        },
+      };
+    }
+
+    // SalesInvoice
+    return {
+      importLevel: "INVOICE_TOTAL",
+      amount: {
+        sourceField: "Amount",
+        sourceType: "decimal",
+      },
+      balance: {
+        sourceField: "Balance",
+        sourceType: "decimal",
+      },
+      date: {
+        sourceField: "Date",
+        sourceType: "date",
+      },
+      uniqueId: {
+        sourceField: "ReferenceNbr",
+      },
+      customer: {
+        idField: "CustomerID",
+      },
+      description: {
+        sourceField: "Description",
+      },
+    };
+  }
+
+  /**
+   * Get entities to use based on document type selection
+   */
+  static getEntitiesForDocumentType(
+    documentTypeSelection: DocumentTypeSelection,
+  ): Array<"SalesOrder" | "SalesInvoice"> {
+    switch (documentTypeSelection) {
+      case "SALES_ORDERS":
+        return ["SalesOrder"];
+      case "SALES_INVOICES":
+        return ["SalesInvoice"];
+      case "BOTH":
+        return ["SalesOrder", "SalesInvoice"];
+    }
   }
 
   /**
@@ -64,7 +130,7 @@ export class SchemaDiscoveryService {
    */
   static async getRestApiEntitySchema(
     client: AcumaticaClient,
-    entityName: string
+    entityName: string,
   ): Promise<FieldInfo[]> {
     try {
       // Fetch the ad-hoc schema for the entity
@@ -74,7 +140,7 @@ export class SchemaDiscoveryService {
 
       if (!response.ok) {
         throw new Error(
-          `Failed to fetch schema for ${entityName}: ${response.status} ${response.statusText}`
+          `Failed to fetch schema for ${entityName}: ${response.status} ${response.statusText}`,
         );
       }
 
@@ -93,15 +159,15 @@ export class SchemaDiscoveryService {
    */
   static async getExpandedFields(
     client: AcumaticaClient,
-    entityName: string
+    entityName: string,
   ): Promise<FieldInfo[]> {
     const expandedFields: FieldInfo[] = [];
 
-    // Define which sections to expand for each entity
+    // Define which sections to expand for each entity (removed Commissions)
     const expansionMap: Record<string, string[]> = {
-      SalesOrder: ['FinancialSettings', 'Commissions', 'Details'],
-      SalesInvoice: ['Commissions', 'FinancialDetails', 'BillingSettings'],
-      Invoice: ['Details', 'TaxDetails'],
+      SalesOrder: ["FinancialSettings", "Details"],
+      SalesInvoice: ["FinancialDetails", "BillingSettings"],
+      Invoice: ["Details", "TaxDetails"],
     };
 
     const sectionsToExpand = expansionMap[entityName];
@@ -111,10 +177,10 @@ export class SchemaDiscoveryService {
 
     try {
       // Fetch a sample record with expanded sections
-      const expandQuery = `$expand=${sectionsToExpand.join(',')}`;
+      const expandQuery = `$expand=${sectionsToExpand.join(",")}`;
       const url = `/entity/Default/${client.apiVersion}/${entityName}?$top=1&${expandQuery}`;
 
-      const response = await client.makeRequest('GET', url);
+      const response = await client.makeRequest("GET", url);
       if (!response.ok) {
         console.warn(`Failed to fetch expanded fields for ${entityName}`);
         return expandedFields;
@@ -130,14 +196,16 @@ export class SchemaDiscoveryService {
       // Extract fields from expanded sections
       for (const section of sectionsToExpand) {
         const sectionData = sampleRecord[section];
-        if (!sectionData || typeof sectionData !== 'object') {
+        if (!sectionData || typeof sectionData !== "object") {
           continue;
         }
 
         // Process section fields
         for (const [fieldName, fieldValue] of Object.entries(sectionData)) {
           // Skip metadata fields
-          if (['id', 'rowNumber', 'note', '_links', 'custom'].includes(fieldName)) {
+          if (
+            ["id", "rowNumber", "note", "_links", "custom"].includes(fieldName)
+          ) {
             continue;
           }
 
@@ -146,19 +214,28 @@ export class SchemaDiscoveryService {
 
           // Extract the actual value if wrapped
           let sampleValue = fieldValue;
-          if (fieldValue && typeof fieldValue === 'object' && 'value' in fieldValue) {
+          if (
+            fieldValue &&
+            typeof fieldValue === "object" &&
+            "value" in fieldValue
+          ) {
             sampleValue = (fieldValue as any).value;
           }
 
           // Skip empty objects
-          if (sampleValue && typeof sampleValue === 'object' && Object.keys(sampleValue).length === 0) {
+          if (
+            sampleValue &&
+            typeof sampleValue === "object" &&
+            Object.keys(sampleValue).length === 0
+          ) {
             sampleValue = null;
           }
 
           // Infer type from sample value
-          const inferredType = sampleValue !== null && sampleValue !== undefined
-            ? this.inferTypeFromValue(sampleValue, fieldName)
-            : 'string';
+          const inferredType =
+            sampleValue !== null && sampleValue !== undefined
+              ? this.inferTypeFromValue(sampleValue, fieldName)
+              : "string";
 
           expandedFields.push({
             name: nestedFieldName,
@@ -169,76 +246,19 @@ export class SchemaDiscoveryService {
             isCustom: false,
             isNested: true,
             parentEntity: section,
-            sampleValue: sampleValue !== undefined && sampleValue !== null ? sampleValue : null,
+            sampleValue:
+              sampleValue !== undefined && sampleValue !== null
+                ? sampleValue
+                : null,
           });
         }
       }
 
-      console.log(`[Schema Discovery] Added ${expandedFields.length} expanded fields from ${sectionsToExpand.join(', ')} for ${entityName}`);
+      console.log(
+        `[Schema Discovery] Added ${expandedFields.length} expanded fields from ${sectionsToExpand.join(", ")} for ${entityName}`,
+      );
     } catch (error) {
       console.error(`Error fetching expanded fields for ${entityName}:`, error);
-    }
-
-    // Add special enriched fields for SalesInvoice (from related SalesOrder)
-    if (entityName === 'SalesInvoice') {
-      try {
-        const enrichedSampleUrl = `/entity/Default/${client.apiVersion}/SalesInvoice?$top=1`;
-        const invoiceResponse = await client.makeRequest('GET', enrichedSampleUrl);
-
-        if (invoiceResponse.ok) {
-          const invoices = await invoiceResponse.json();
-          if (invoices && invoices.length > 0) {
-            const invoice = invoices[0];
-            const orderNbr = invoice.CustomerOrder?.value || invoice.OrderNbr?.value;
-
-            if (orderNbr) {
-              // Fetch the related sales order
-              const soQuery = `/entity/Default/${client.apiVersion}/SalesOrder?$filter=OrderNbr eq '${orderNbr}'&$expand=FinancialSettings,Commissions&$top=1`;
-              const soResponse = await client.makeRequest('GET', soQuery);
-
-              if (soResponse.ok) {
-                const salesOrders = await soResponse.json();
-                if (salesOrders && salesOrders.length > 0) {
-                  const so = salesOrders[0];
-
-                  // Add enriched fields
-                  if (so.FinancialSettings?.Owner) {
-                    expandedFields.push({
-                      name: 'SalesOrder_Owner',
-                      displayName: 'Sales Order - Owner',
-                      type: 'string',
-                      description: 'Owner from the related Sales Order',
-                      isRequired: false,
-                      isCustom: false,
-                      isNested: true,
-                      parentEntity: 'SalesOrder',
-                      sampleValue: so.FinancialSettings.Owner.value || so.FinancialSettings.Owner,
-                    });
-                  }
-
-                  if (so.Commissions?.DefaultSalesperson) {
-                    expandedFields.push({
-                      name: 'SalesOrder_DefaultSalesperson',
-                      displayName: 'Sales Order - Default Salesperson',
-                      type: 'string',
-                      description: 'Default Salesperson from the related Sales Order',
-                      isRequired: false,
-                      isCustom: false,
-                      isNested: true,
-                      parentEntity: 'SalesOrder',
-                      sampleValue: so.Commissions.DefaultSalesperson.value || so.Commissions.DefaultSalesperson,
-                    });
-                  }
-
-                  console.log('[Schema Discovery] Added enriched SalesOrder fields to SalesInvoice schema');
-                }
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error('[Schema Discovery] Error adding enriched SalesOrder fields:', error);
-      }
     }
 
     return expandedFields;
@@ -249,18 +269,14 @@ export class SchemaDiscoveryService {
    */
   private static parseRestApiSchema(
     schemaData: any,
-    entityName: string
+    entityName: string,
   ): FieldInfo[] {
     const fields: FieldInfo[] = [];
-
-    // The schema structure varies by Acumatica version, but typically:
-    // - schemaData.fields or schemaData.properties contains field definitions
-    // - custom fields are prefixed with "custom/"
 
     const properties = schemaData.fields || schemaData.properties || schemaData;
 
     // Fields to skip - these are metadata fields, not actual data fields
-    const skipFields = new Set(['id', 'rowNumber', 'note', '_links', 'custom']);
+    const skipFields = new Set(["id", "rowNumber", "note", "_links", "custom"]);
 
     for (const [fieldName, fieldDef] of Object.entries(properties)) {
       const def = fieldDef as any;
@@ -291,310 +307,33 @@ export class SchemaDiscoveryService {
   }
 
   /**
-   * Discover available Generic Inquiries exposed via OData
-   */
-  static async discoverGenericInquiries(
-    client: AcumaticaClient
-  ): Promise<InquiryInfo[]> {
-    // Generic Inquiries in Acumatica are exposed via the /odata/$metadata endpoint
-    // This endpoint requires Basic Authentication instead of session cookies
-    const metadataUrl = '/odata/$metadata';
-
-    try {
-      console.log(`[Schema Discovery] Discovering Generic Inquiries from: ${metadataUrl}`);
-      console.log(`[Schema Discovery] Using Basic Authentication for OData endpoint`);
-
-      const response = await client.makeBasicAuthRequest("GET", metadataUrl);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(
-          `[Schema Discovery] Failed to fetch Generic Inquiry metadata: ${response.status} ${response.statusText}`
-        );
-        console.error(`[Schema Discovery] Error response: ${errorText.substring(0, 500)}`);
-        throw new Error(`Failed to access Generic Inquiry OData endpoint: ${response.status} ${response.statusText}`);
-      }
-
-      const metadataXml = await response.text();
-
-      console.log(`[Schema Discovery] Successfully retrieved metadata (${metadataXml.length} characters)`);
-
-      // Parse the OData metadata XML
-      const inquiries = this.parseGenericInquiryMetadata(metadataXml, client.apiVersion);
-
-      if (inquiries.length > 0) {
-        console.log(`[Schema Discovery] Found ${inquiries.length} Generic Inquiries`);
-        console.log(`[Schema Discovery] Inquiry names: ${inquiries.map(i => i.name).join(', ')}`);
-
-        // Update the endpoint for each inquiry
-        const updatedInquiries = inquiries.map(inq => ({
-          ...inq,
-          endpoint: `/odata/${inq.name}`,
-        }));
-
-        return updatedInquiries;
-      } else {
-        console.warn(`[Schema Discovery] No Generic Inquiries found in metadata`);
-        console.warn(`[Schema Discovery] This means no Generic Inquiries have been published via OData`);
-        console.warn(`[Schema Discovery] Please create a Generic Inquiry in Acumatica (SM208000) and check "Expose via OData"`);
-        return [];
-      }
-    } catch (error) {
-      console.error('[Schema Discovery] Error discovering Generic Inquiries:', error);
-      console.error(
-        '[Schema Discovery] Possible causes:\n' +
-        '  1. Generic Inquiry OData is not enabled in Acumatica (SM207045)\n' +
-        '  2. No Generic Inquiries have been published via OData (check "Expose via OData" in SM208000)\n' +
-        '  3. User lacks permissions to access OData endpoints\n' +
-        '  4. Authentication failed (Basic Auth required for OData)'
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Get the schema for a specific Generic Inquiry
-   */
-  static async getGenericInquirySchema(
-    client: AcumaticaClient,
-    inquiryName: string
-  ): Promise<FieldInfo[]> {
-    try {
-      // Generic Inquiries expose their schema through OData metadata
-      // Use Basic Auth for OData endpoints
-      const metadataUrl = `/odata/$metadata`;
-
-      console.log(`[Schema Discovery] Fetching schema for Generic Inquiry: ${inquiryName}`);
-
-      const response = await client.makeBasicAuthRequest("GET", metadataUrl);
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch Generic Inquiry schema: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const metadataXml = await response.text();
-
-      console.log(`[Schema Discovery] Parsing schema for ${inquiryName} from metadata`);
-
-      // Parse the metadata for this specific inquiry
-      return this.parseGenericInquirySchema(metadataXml, inquiryName);
-    } catch (error) {
-      console.error(
-        `Error fetching Generic Inquiry schema for ${inquiryName}:`,
-        error
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Parse Generic Inquiry OData metadata XML
-   */
-  private static parseGenericInquiryMetadata(
-    metadataXml: string,
-    apiVersion: string
-  ): InquiryInfo[] {
-    const inquiries: InquiryInfo[] = [];
-
-    // Simple XML parsing - look for EntitySet elements
-    // In a production system, you'd use a proper XML parser
-    const entitySetRegex = /<EntitySet Name="([^"]+)"/g;
-    let match;
-
-    while ((match = entitySetRegex.exec(metadataXml)) !== null) {
-      const inquiryName = match[1];
-
-      inquiries.push({
-        name: inquiryName,
-        inquiryName: inquiryName,
-        endpoint: `/odata/${inquiryName}`,
-        displayName: inquiryName,
-        description: `Generic Inquiry: ${inquiryName}`,
-        isODataExposed: true,
-      });
-    }
-
-    return inquiries;
-  }
-
-  /**
-   * Parse Generic Inquiry schema from OData metadata
-   */
-  private static parseGenericInquirySchema(
-    metadataXml: string,
-    inquiryName: string
-  ): FieldInfo[] {
-    const fields: FieldInfo[] = [];
-
-    // Find the EntityType definition for this inquiry
-    const entityTypeRegex = new RegExp(
-      `<EntityType Name="${inquiryName}"[\\s\\S]*?</EntityType>`,
-      "g"
-    );
-    const entityTypeMatch = entityTypeRegex.exec(metadataXml);
-
-    if (!entityTypeMatch) {
-      return fields;
-    }
-
-    const entityTypeDef = entityTypeMatch[0];
-
-    // Parse Property elements
-    const propertyRegex = /<Property Name="([^"]+)" Type="([^"]+)"(.*?)\/>/g;
-    let match;
-
-    while ((match = propertyRegex.exec(entityTypeDef)) !== null) {
-      const fieldName = match[1];
-      const fieldType = match[2];
-      const attributes = match[3];
-
-      fields.push({
-        name: fieldName,
-        displayName: fieldName,
-        type: this.mapODataType(fieldType),
-        isRequired: attributes.includes('Nullable="false"'),
-        isCustom: false,
-        isNested: false,
-      });
-    }
-
-    return fields;
-  }
-
-  /**
-   * Discover available DAC entities (advanced)
-   */
-  static async discoverDacEntities(
-    client: AcumaticaClient
-  ): Promise<EntityInfo[]> {
-    try {
-      // Fetch the OData metadata for DAC entities
-      const metadataUrl = `/api/odata/dac/$metadata`;
-
-      const response = await client.makeRequest("GET", metadataUrl);
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch DAC metadata: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const metadataXml = await response.text();
-
-      // Parse the OData metadata XML for DAC entities
-      return this.parseDacMetadata(metadataXml);
-    } catch (error) {
-      console.error("Error fetching DAC metadata:", error);
-      return [];
-    }
-  }
-
-  /**
-   * Get the schema for a specific DAC entity
-   */
-  static async getDacEntitySchema(
-    client: AcumaticaClient,
-    dacName: string
-  ): Promise<FieldInfo[]> {
-    try {
-      const metadataUrl = `/api/odata/dac/$metadata`;
-
-      const response = await client.makeRequest("GET", metadataUrl);
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch DAC schema: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const metadataXml = await response.text();
-
-      // Parse the metadata for this specific DAC
-      return this.parseDacSchema(metadataXml, dacName);
-    } catch (error) {
-      console.error(`Error fetching DAC schema for ${dacName}:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Parse DAC OData metadata
-   */
-  private static parseDacMetadata(metadataXml: string): EntityInfo[] {
-    const entities: EntityInfo[] = [];
-
-    // Simple XML parsing - look for EntitySet elements
-    const entitySetRegex = /<EntitySet Name="([^"]+)"/g;
-    let match;
-
-    while ((match = entitySetRegex.exec(metadataXml)) !== null) {
-      const dacName = match[1];
-
-      entities.push({
-        name: dacName,
-        endpoint: `/odatav4/${dacName}`,
-        displayName: dacName,
-        description: `DAC: ${dacName}`,
-      });
-    }
-
-    return entities;
-  }
-
-  /**
-   * Parse DAC schema from OData metadata
-   */
-  private static parseDacSchema(
-    metadataXml: string,
-    dacName: string
-  ): FieldInfo[] {
-    // Similar to Generic Inquiry schema parsing
-    return this.parseGenericInquirySchema(metadataXml, dacName);
-  }
-
-  /**
    * Get sample data from a data source for preview
    */
   static async getSampleData(
     client: AcumaticaClient,
     dataSource: { type: DataSourceType; entity: string },
-    limit: number = 10
+    limit: number = 10,
   ): Promise<any[]> {
     try {
-      let query = "";
-      let useBasicAuth = false;
+      // Define which sections to expand (removed Commissions)
+      const expansionMap: Record<string, string[]> = {
+        SalesOrder: ["FinancialSettings", "Details"],
+        SalesInvoice: ["FinancialDetails", "BillingSettings"],
+        Invoice: ["Details", "TaxDetails"],
+      };
 
-      if (dataSource.type === "REST_API") {
-        // Add expand query for entities with nested sections
-        const expansionMap: Record<string, string[]> = {
-          SalesOrder: ['FinancialSettings', 'Commissions', 'Details'],
-          SalesInvoice: ['Commissions', 'FinancialDetails', 'BillingSettings'],
-          Invoice: ['Details', 'TaxDetails'],
-        };
+      const sectionsToExpand = expansionMap[dataSource.entity];
+      const expandQuery = sectionsToExpand
+        ? `&$expand=${sectionsToExpand.join(",")}`
+        : "";
 
-        const sectionsToExpand = expansionMap[dataSource.entity];
-        const expandQuery = sectionsToExpand ? `&$expand=${sectionsToExpand.join(',')}` : '';
+      const query = `/entity/Default/${client.apiVersion}/${dataSource.entity}?$top=${limit}${expandQuery}`;
 
-        query = `/entity/Default/${client.apiVersion}/${dataSource.entity}?$top=${limit}${expandQuery}`;
-        useBasicAuth = false;
-      } else if (dataSource.type === "GENERIC_INQUIRY") {
-        // Generic Inquiry OData requires Basic Auth
-        query = `/odata/${dataSource.entity}?$top=${limit}`;
-        useBasicAuth = true;
-      } else if (dataSource.type === "DAC_ODATA") {
-        query = `/odatav4/${dataSource.entity}?$top=${limit}`;
-        useBasicAuth = true;
-      }
-
-      const response = useBasicAuth
-        ? await client.makeBasicAuthRequest("GET", query)
-        : await client.makeRequest("GET", query);
+      const response = await client.makeRequest("GET", query);
 
       if (!response.ok) {
         throw new Error(
-          `Failed to fetch sample data: ${response.status} ${response.statusText}`
+          `Failed to fetch sample data: ${response.status} ${response.statusText}`,
         );
       }
 
@@ -610,11 +349,6 @@ export class SchemaDiscoveryService {
         records = [data];
       }
 
-      // Enrich records with related data if needed (e.g., SalesInvoice with SalesOrder)
-      if (dataSource.type === "REST_API") {
-        records = await enrichRecords(client, dataSource.entity, records);
-      }
-
       return records;
     } catch (error) {
       console.error("Error fetching sample data:", error);
@@ -627,7 +361,7 @@ export class SchemaDiscoveryService {
    */
   static async cacheSchema(
     integrationId: string,
-    schema: DiscoveredSchema
+    schema: DiscoveredSchema,
   ): Promise<void> {
     await prisma.acumaticaIntegration.update({
       where: { id: integrationId },
@@ -642,7 +376,7 @@ export class SchemaDiscoveryService {
    * Get cached schema from database
    */
   static async getCachedSchema(
-    integrationId: string
+    integrationId: string,
   ): Promise<DiscoveredSchema | null> {
     const integration = await prisma.acumaticaIntegration.findUnique({
       where: { id: integrationId },
@@ -665,25 +399,16 @@ export class SchemaDiscoveryService {
   static async buildDiscoveredSchema(
     client: AcumaticaClient,
     dataSourceType: DataSourceType,
-    entityName: string
+    entityName: string,
   ): Promise<DiscoveredSchema> {
     let fields: FieldInfo[] = [];
-    let endpoint = "";
+    const endpoint = `/entity/Default/${client.apiVersion}/${entityName}`;
 
-    if (dataSourceType === "REST_API") {
-      fields = await this.getRestApiEntitySchema(client, entityName);
-      endpoint = `/entity/Default/${client.apiVersion}/${entityName}`;
+    fields = await this.getRestApiEntitySchema(client, entityName);
 
-      // Add nested fields from expandable sections for specific entities
-      const expandedFields = await this.getExpandedFields(client, entityName);
-      fields = [...fields, ...expandedFields];
-    } else if (dataSourceType === "GENERIC_INQUIRY") {
-      fields = await this.getGenericInquirySchema(client, entityName);
-      endpoint = `/odata/${entityName}`;
-    } else if (dataSourceType === "DAC_ODATA") {
-      fields = await this.getDacEntitySchema(client, entityName);
-      endpoint = `/odatav4/${entityName}`;
-    }
+    // Add nested fields from expandable sections
+    const expandedFields = await this.getExpandedFields(client, entityName);
+    fields = [...fields, ...expandedFields];
 
     const customFieldCount = fields.filter((f) => f.isCustom).length;
     const nestedEntities = [
@@ -733,18 +458,12 @@ export class SchemaDiscoveryService {
   }
 
   /**
-   * Map OData type to our type system
-   */
-  private static mapODataType(odataType: string): AcumaticaFieldType {
-    // OData types like "Edm.String", "Edm.Decimal", etc.
-    const cleanType = odataType.replace("Edm.", "");
-    return this.mapAcumaticaType(cleanType);
-  }
-
-  /**
    * Infer field type from a sample value
    */
-  private static inferTypeFromValue(value: any, fieldName?: string): AcumaticaFieldType {
+  private static inferTypeFromValue(
+    value: any,
+    fieldName?: string,
+  ): AcumaticaFieldType {
     if (value === null || value === undefined) {
       return "string";
     }
@@ -757,10 +476,22 @@ export class SchemaDiscoveryService {
     // Check for number types
     if (typeof value === "number") {
       // Financial/monetary fields should always be treated as decimal
-      const monetaryFieldNames = ['amount', 'total', 'balance', 'price', 'cost', 'tax', 'discount', 'payment', 'fee'];
-      const isMonetaryField = fieldName && monetaryFieldNames.some(name =>
-        fieldName.toLowerCase().includes(name)
-      );
+      const monetaryFieldNames = [
+        "amount",
+        "total",
+        "balance",
+        "price",
+        "cost",
+        "tax",
+        "discount",
+        "payment",
+        "fee",
+      ];
+      const isMonetaryField =
+        fieldName &&
+        monetaryFieldNames.some((name) =>
+          fieldName.toLowerCase().includes(name),
+        );
 
       if (isMonetaryField) {
         return "decimal";
@@ -781,7 +512,11 @@ export class SchemaDiscoveryService {
         return "date";
       }
       // GUID format
-      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
+      if (
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          value,
+        )
+      ) {
         return "guid";
       }
     }
@@ -806,7 +541,7 @@ export class SchemaDiscoveryService {
    */
   static enrichFieldsWithSamples(
     fields: FieldInfo[],
-    sampleData: any[]
+    sampleData: any[],
   ): FieldInfo[] {
     if (sampleData.length === 0) {
       return fields;
@@ -821,25 +556,36 @@ export class SchemaDiscoveryService {
       // Acumatica REST API returns values in format: { value: actualValue }
       // Extract the actual value from this wrapper
       let sampleValue = rawValue;
-      if (rawValue && typeof rawValue === 'object' && 'value' in rawValue) {
+      if (rawValue && typeof rawValue === "object" && "value" in rawValue) {
         sampleValue = rawValue.value;
       }
 
       // Skip empty objects that have no value property
-      if (sampleValue && typeof sampleValue === 'object' && Object.keys(sampleValue).length === 0) {
+      if (
+        sampleValue &&
+        typeof sampleValue === "object" &&
+        Object.keys(sampleValue).length === 0
+      ) {
         sampleValue = null;
       }
 
       // Infer the actual type from the sample value if we only have 'string' type
       let inferredType = field.type;
-      if (field.type === 'string' && sampleValue !== null && sampleValue !== undefined) {
+      if (
+        field.type === "string" &&
+        sampleValue !== null &&
+        sampleValue !== undefined
+      ) {
         inferredType = this.inferTypeFromValue(sampleValue, field.name);
       }
 
       return {
         ...field,
         type: inferredType,
-        sampleValue: sampleValue !== undefined && sampleValue !== null ? sampleValue : null,
+        sampleValue:
+          sampleValue !== undefined && sampleValue !== null
+            ? sampleValue
+            : null,
       };
     });
   }

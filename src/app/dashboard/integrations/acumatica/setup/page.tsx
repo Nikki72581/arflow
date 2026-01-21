@@ -1,34 +1,41 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
+} from "@/components/ui/card";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, CheckCircle, XCircle, ArrowRight, Search, Pencil } from 'lucide-react';
-import { testAcumaticaConnection, saveAcumaticaConnection, listAcumaticaCompanies, getAcumaticaIntegration } from '@/actions/integrations/acumatica/connection';
+} from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Loader2,
+  CheckCircle,
+  XCircle,
+  ArrowRight,
+  Search,
+  Pencil,
+} from "lucide-react";
+import {
+  testAcumaticaConnection,
+  saveAcumaticaConnection,
+  listAcumaticaCompanies,
+  getAcumaticaIntegration,
+} from "@/actions/integrations/acumatica/connection";
 
-const API_VERSIONS = [
-  '23.200.001',
-  '24.100.001',
-  '24.200.001',
-  '25.100.001',
-];
+const API_VERSIONS = ["23.200.001", "24.100.001", "24.200.001", "25.100.001"];
 
 export default function AcumaticaSetupPage() {
   const router = useRouter();
@@ -36,11 +43,11 @@ export default function AcumaticaSetupPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [formData, setFormData] = useState({
-    instanceUrl: '',
-    apiVersion: '24.200.001',
-    companyId: '',
-    username: '',
-    password: '',
+    instanceUrl: "",
+    apiVersion: "24.200.001",
+    companyId: "",
+    username: "",
+    password: "",
   });
 
   const [testing, setTesting] = useState(false);
@@ -61,7 +68,7 @@ export default function AcumaticaSetupPage() {
       try {
         const integration = await getAcumaticaIntegration();
         if (integration) {
-          console.log('[Client] Loaded existing integration:', {
+          console.log("[Client] Loaded existing integration:", {
             hasInstanceUrl: !!integration.instanceUrl,
             hasApiVersion: !!integration.apiVersion,
             hasCompanyId: !!integration.companyId,
@@ -72,10 +79,10 @@ export default function AcumaticaSetupPage() {
             instanceUrl: integration.instanceUrl,
             apiVersion: integration.apiVersion,
             companyId: integration.companyId,
-            username: '', // Don't pre-fill for security
-            password: '', // User needs to re-enter to make changes
+            username: "", // Don't pre-fill for security
+            password: "", // User needs to re-enter to make changes
           });
-          setIsConnected(integration.status === 'ACTIVE');
+          setIsConnected(integration.status === "ACTIVE");
 
           // Show info that credentials are saved
           if (integration.encryptedCredentials) {
@@ -86,7 +93,7 @@ export default function AcumaticaSetupPage() {
           }
         }
       } catch (error) {
-        console.error('[Client] Failed to load integration:', error);
+        console.error("[Client] Failed to load integration:", error);
       } finally {
         setLoading(false);
       }
@@ -102,7 +109,7 @@ export default function AcumaticaSetupPage() {
       setTestResult(null);
     }
     // Clear available companies if changing credentials
-    if (['instanceUrl', 'apiVersion', 'username', 'password'].includes(field)) {
+    if (["instanceUrl", "apiVersion", "username", "password"].includes(field)) {
       setAvailableCompanies(null);
     }
   };
@@ -130,13 +137,16 @@ export default function AcumaticaSetupPage() {
       } else {
         setTestResult({
           success: false,
-          error: result.error || 'Failed to fetch companies',
+          error: result.error || "Failed to fetch companies",
         });
       }
     } catch (error) {
       setTestResult({
         success: false,
-        error: error instanceof Error ? error.message : 'An unexpected error occurred',
+        error:
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred",
       });
     } finally {
       setFetchingCompanies(false);
@@ -144,12 +154,12 @@ export default function AcumaticaSetupPage() {
   };
 
   const handleTestConnection = async () => {
-    console.log('[Client] handleTestConnection called');
+    console.log("[Client] handleTestConnection called");
     setTesting(true);
     setTestResult(null);
 
     try {
-      console.log('[Client] Testing connection with:', {
+      console.log("[Client] Testing connection with:", {
         instanceUrl: formData.instanceUrl,
         apiVersion: formData.apiVersion,
         companyId: formData.companyId,
@@ -157,18 +167,18 @@ export default function AcumaticaSetupPage() {
         // Don't log password
       });
 
-      console.log('[Client] Calling testAcumaticaConnection...');
+      console.log("[Client] Calling testAcumaticaConnection...");
       const result = await testAcumaticaConnection(formData);
-      console.log('[Client] Test result received:', JSON.stringify(result));
+      console.log("[Client] Test result received:", JSON.stringify(result));
 
       if (!result) {
-        console.error('[Client] Result is null or undefined');
+        console.error("[Client] Result is null or undefined");
         const errorResult = {
           success: false as const,
-          error: 'No response from server',
+          error: "No response from server",
         };
         setTestResult(errorResult);
-        console.log('[Client] Set error result:', JSON.stringify(errorResult));
+        console.log("[Client] Set error result:", JSON.stringify(errorResult));
         return;
       }
 
@@ -177,19 +187,25 @@ export default function AcumaticaSetupPage() {
         success: result.success,
         error: result.error,
       };
-      console.log('[Client] Setting test result:', JSON.stringify(finalResult));
+      console.log("[Client] Setting test result:", JSON.stringify(finalResult));
       setTestResult(finalResult);
-      console.log('[Client] Test result state updated');
+      console.log("[Client] Test result state updated");
     } catch (error) {
-      console.error('[Client] Test connection error:', error);
+      console.error("[Client] Test connection error:", error);
       const errorResult = {
         success: false as const,
-        error: error instanceof Error ? error.message : 'An unexpected error occurred',
+        error:
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred",
       };
       setTestResult(errorResult);
-      console.log('[Client] Set exception result:', JSON.stringify(errorResult));
+      console.log(
+        "[Client] Set exception result:",
+        JSON.stringify(errorResult),
+      );
     } finally {
-      console.log('[Client] Setting testing to false');
+      console.log("[Client] Setting testing to false");
       setTesting(false);
     }
   };
@@ -201,8 +217,10 @@ export default function AcumaticaSetupPage() {
       // If credentials are already saved and user hasn't entered new ones,
       // just navigate to the next step
       if (testResult?.success && !formData.username && !formData.password) {
-        console.log('[Client] Credentials already saved, proceeding to next step');
-        router.push('/dashboard/integrations/acumatica/setup/data-source');
+        console.log(
+          "[Client] Credentials already saved, proceeding to next step",
+        );
+        router.push("/dashboard/integrations/acumatica/setup/document-type");
         return;
       }
 
@@ -211,17 +229,17 @@ export default function AcumaticaSetupPage() {
 
       if (result.success) {
         // Navigate to next step (data source selection)
-        router.push('/dashboard/integrations/acumatica/setup/data-source');
+        router.push("/dashboard/integrations/acumatica/setup/document-type");
       } else {
         setTestResult({
           success: false,
-          error: result.error || 'Failed to save connection',
+          error: result.error || "Failed to save connection",
         });
       }
     } catch (error) {
       setTestResult({
         success: false,
-        error: 'An unexpected error occurred',
+        error: "An unexpected error occurred",
       });
     } finally {
       setSaving(false);
@@ -236,7 +254,8 @@ export default function AcumaticaSetupPage() {
     formData.password;
 
   const canProceed = testResult?.success === true;
-  const credentialsSaved = testResult?.success && !formData.username && !formData.password;
+  const credentialsSaved =
+    testResult?.success && !formData.username && !formData.password;
   const fieldsDisabled = credentialsSaved && !isEditing;
 
   if (loading) {
@@ -255,7 +274,7 @@ export default function AcumaticaSetupPage() {
           Connect to Acumatica
         </h1>
         <p className="text-muted-foreground mt-2">
-          Step 1 of 7: Enter your Acumatica instance credentials
+          Step 1 of 3: Enter your Acumatica instance credentials
         </p>
       </div>
 
@@ -263,7 +282,7 @@ export default function AcumaticaSetupPage() {
       <div className="w-full bg-muted rounded-full h-2">
         <div
           className="bg-gradient-to-r from-purple-600 to-blue-600 h-2 rounded-full transition-all"
-          style={{ width: '14.29%' }}
+          style={{ width: "33.33%" }}
         />
       </div>
 
@@ -271,7 +290,8 @@ export default function AcumaticaSetupPage() {
         <Alert className="border-emerald-500/30 bg-emerald-500/10">
           <CheckCircle className="h-4 w-4 text-emerald-600" />
           <AlertDescription className="text-emerald-700 dark:text-emerald-400">
-            Acumatica is connected. Update credentials if needed or continue setup.
+            Acumatica is connected. Update credentials if needed or continue
+            setup.
           </AlertDescription>
         </Alert>
       )}
@@ -286,14 +306,19 @@ export default function AcumaticaSetupPage() {
                 Connection Configured
               </div>
               <AlertDescription className="text-emerald-800 dark:text-emerald-200">
-                Your Acumatica credentials are already saved and verified. You can proceed to configure your data source.
+                Your Acumatica credentials are already saved and verified. You
+                can proceed to configure your data source.
               </AlertDescription>
             </div>
             <Button
-              onClick={() => router.push('/dashboard/integrations/acumatica/setup/data-source')}
+              onClick={() =>
+                router.push(
+                  "/dashboard/integrations/acumatica/setup/document-type",
+                )
+              }
               className="ml-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 flex-shrink-0"
             >
-              Continue to Data Source
+              Continue to Document Types
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
@@ -306,8 +331,8 @@ export default function AcumaticaSetupPage() {
             <div>
               <CardTitle>Connection Settings</CardTitle>
               <CardDescription>
-                Enter your Acumatica instance details. You can find these in your
-                Acumatica admin panel.
+                Enter your Acumatica instance details. You can find these in
+                your Acumatica admin panel.
               </CardDescription>
             </div>
             {credentialsSaved && !isEditing && (
@@ -334,7 +359,7 @@ export default function AcumaticaSetupPage() {
               type="url"
               placeholder="https://yourcompany.acumatica.com"
               value={formData.instanceUrl}
-              onChange={(e) => handleInputChange('instanceUrl', e.target.value)}
+              onChange={(e) => handleInputChange("instanceUrl", e.target.value)}
               disabled={fieldsDisabled}
               className="font-mono"
             />
@@ -350,7 +375,7 @@ export default function AcumaticaSetupPage() {
             </Label>
             <Select
               value={formData.apiVersion}
-              onValueChange={(value) => handleInputChange('apiVersion', value)}
+              onValueChange={(value) => handleInputChange("apiVersion", value)}
               disabled={fieldsDisabled}
             >
               <SelectTrigger disabled={fieldsDisabled}>
@@ -407,33 +432,46 @@ export default function AcumaticaSetupPage() {
               id="companyId"
               placeholder="MYCOMPANY"
               value={formData.companyId}
-              onChange={(e) => handleInputChange('companyId', e.target.value)}
+              onChange={(e) => handleInputChange("companyId", e.target.value)}
               disabled={fieldsDisabled}
             />
             <p className="text-sm text-muted-foreground">
-              Your Acumatica tenant/company identifier. Click "Find Company IDs" to try retrieving available companies (may not work on all Acumatica instances).
+              Your Acumatica tenant/company identifier. Click "Find Company IDs"
+              to try retrieving available companies (may not work on all
+              Acumatica instances).
             </p>
 
             {/* Show help if fetch fails */}
-            {testResult && !testResult.success && testResult.error?.includes('500') && (
-              <Alert className="border-yellow-500/50 bg-yellow-500/10">
-                <AlertDescription>
-                  <div className="space-y-2">
-                    <p className="font-medium text-sm">Unable to automatically fetch companies.</p>
-                    <p className="text-xs text-muted-foreground">
-                      Common Company ID formats:
-                    </p>
-                    <ul className="text-xs text-muted-foreground list-disc list-inside space-y-1">
-                      <li>Company name (e.g., "Production", "Test", "Live")</li>
-                      <li>Abbreviated name (e.g., "PROD", "DEV", "QA")</li>
-                      <li>Your organization name</li>
-                      <li>Check your Acumatica login screen for the company dropdown</li>
-                      <li>Ask your Acumatica administrator for the tenant name</li>
-                    </ul>
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
+            {testResult &&
+              !testResult.success &&
+              testResult.error?.includes("500") && (
+                <Alert className="border-yellow-500/50 bg-yellow-500/10">
+                  <AlertDescription>
+                    <div className="space-y-2">
+                      <p className="font-medium text-sm">
+                        Unable to automatically fetch companies.
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Common Company ID formats:
+                      </p>
+                      <ul className="text-xs text-muted-foreground list-disc list-inside space-y-1">
+                        <li>
+                          Company name (e.g., "Production", "Test", "Live")
+                        </li>
+                        <li>Abbreviated name (e.g., "PROD", "DEV", "QA")</li>
+                        <li>Your organization name</li>
+                        <li>
+                          Check your Acumatica login screen for the company
+                          dropdown
+                        </li>
+                        <li>
+                          Ask your Acumatica administrator for the tenant name
+                        </li>
+                      </ul>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
 
             {/* Show available companies */}
             {availableCompanies && availableCompanies.length > 0 && (
@@ -446,7 +484,9 @@ export default function AcumaticaSetupPage() {
                         <button
                           key={company.id}
                           type="button"
-                          onClick={() => handleInputChange('companyId', company.id)}
+                          onClick={() =>
+                            handleInputChange("companyId", company.id)
+                          }
                           className="block w-full text-left px-3 py-2 text-sm rounded-md hover:bg-indigo-500/20 transition-colors"
                         >
                           <div className="font-mono font-medium text-indigo-600 dark:text-indigo-400">
@@ -472,15 +512,15 @@ export default function AcumaticaSetupPage() {
             <Input
               id="username"
               autoComplete="username"
-              placeholder={fieldsDisabled ? '••••••••' : 'admin'}
+              placeholder={fieldsDisabled ? "••••••••" : "admin"}
               value={formData.username}
-              onChange={(e) => handleInputChange('username', e.target.value)}
+              onChange={(e) => handleInputChange("username", e.target.value)}
               disabled={fieldsDisabled}
             />
             <p className="text-sm text-muted-foreground">
               {fieldsDisabled
-                ? 'Username is securely saved'
-                : 'API user with access to Sales Invoice, Salesperson, and Customer endpoints'}
+                ? "Username is securely saved"
+                : "API user with access to Sales Invoice, Sales Order, and Customer endpoints"}
             </p>
           </div>
 
@@ -493,26 +533,26 @@ export default function AcumaticaSetupPage() {
               id="password"
               type="password"
               autoComplete="current-password"
-              placeholder={fieldsDisabled ? '••••••••' : ''}
+              placeholder={fieldsDisabled ? "••••••••" : ""}
               value={formData.password}
-              onChange={(e) => handleInputChange('password', e.target.value)}
+              onChange={(e) => handleInputChange("password", e.target.value)}
               disabled={fieldsDisabled}
             />
             <p className="text-sm text-muted-foreground">
               {fieldsDisabled
-                ? 'Password is securely encrypted and saved'
-                : 'Password will be encrypted and stored securely'}
+                ? "Password is securely encrypted and saved"
+                : "Password will be encrypted and stored securely"}
             </p>
           </div>
 
           {/* Test Result */}
           {testResult && (
             <Alert
-              variant={testResult.success ? 'default' : 'destructive'}
+              variant={testResult.success ? "default" : "destructive"}
               className={
                 testResult.success
-                  ? 'border-emerald-500/50 bg-emerald-500/10'
-                  : ''
+                  ? "border-emerald-500/50 bg-emerald-500/10"
+                  : ""
               }
             >
               <div className="flex items-start gap-2">
@@ -522,11 +562,13 @@ export default function AcumaticaSetupPage() {
                   <XCircle className="h-5 w-5 mt-0.5" />
                 )}
                 <AlertDescription>
-                  {testResult.success && !formData.username && !formData.password
-                    ? 'Credentials saved! Enter username and password to update or proceed to the next step.'
+                  {testResult.success &&
+                  !formData.username &&
+                  !formData.password
+                    ? "Credentials saved! Enter username and password to update or proceed to the next step."
                     : testResult.success
-                    ? 'Connection successful! You can proceed to the next step.'
-                    : `Connection failed: ${testResult.error}`}
+                      ? "Connection successful! You can proceed to the next step."
+                      : `Connection failed: ${testResult.error}`}
                 </AlertDescription>
               </div>
             </Alert>
@@ -546,7 +588,7 @@ export default function AcumaticaSetupPage() {
                   Testing Connection...
                 </>
               ) : (
-                'Test Connection'
+                "Test Connection"
               )}
             </Button>
 
@@ -574,26 +616,35 @@ export default function AcumaticaSetupPage() {
       {/* Help Card */}
       <Card className="border-blue-500/20 bg-gradient-to-br from-blue-500/5 to-cyan-500/5">
         <CardHeader>
-          <CardTitle className="text-lg">Need Help Finding Your Credentials?</CardTitle>
+          <CardTitle className="text-lg">
+            Need Help Finding Your Credentials?
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
-            <strong>Instance URL:</strong> This is the web address you use to access Acumatica
-            (e.g., https://yourcompany.acumatica.com)
+            <strong>Instance URL:</strong> This is the web address you use to
+            access Acumatica (e.g., https://yourcompany.acumatica.com)
           </p>
           <p>
-            <strong>API Version:</strong> Found in Acumatica under System → Web Services → Contract-Based API
+            <strong>API Version:</strong> Found in Acumatica under System → Web
+            Services → Contract-Based API
           </p>
           <p>
-            <strong>Company ID:</strong> The tenant name shown in the login screen or company selector
+            <strong>Company ID:</strong> The tenant name shown in the login
+            screen or company selector
           </p>
           <p>
-            <strong>Credentials:</strong> We recommend creating a dedicated API user with read-only access to Sales Invoice, Salesperson, and Customer screens
+            <strong>Credentials:</strong> We recommend creating a dedicated API
+            user with read-only access to Sales Order, Sales Invoice, and
+            Customer screens
           </p>
           <div className="pt-3 mt-3 border-t border-blue-500/20">
             <p className="text-xs">
-              <strong>Version Compatibility:</strong> This integration was developed and tested with Acumatica 2025 R1 (25.101.0153.5).
-              Other versions may have different field availability or API behaviors. If you experience issues, verify your Acumatica version supports the required API endpoints.
+              <strong>Version Compatibility:</strong> This integration was
+              developed and tested with Acumatica 2025 R1 (25.101.0153.5). Other
+              versions may have different field availability or API behaviors.
+              If you experience issues, verify your Acumatica version supports
+              the required API endpoints.
             </p>
           </div>
         </CardContent>

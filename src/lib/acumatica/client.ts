@@ -1,7 +1,6 @@
 import {
   AcumaticaConnectionConfig,
   AcumaticaInvoice,
-  AcumaticaSalesperson,
   AcumaticaBranch,
   AcumaticaItemClass,
   AcumaticaCustomer,
@@ -18,13 +17,12 @@ import {
  * Other versions may have different data structures, available fields, or API behaviors.
  *
  * Known version-specific considerations:
- * - Email field availability on Salesperson endpoint may vary
  * - IsActive field filtering support may differ
  * - OData query capabilities may change between versions
  * - Field names and data structures may be modified in different releases
  *
  * If connecting to a different Acumatica version, verify:
- * 1. Available fields on each endpoint (Salesperson, SalesInvoice, Customer, etc.)
+ * 1. Available fields on each endpoint (SalesInvoice, SalesOrder, Customer, etc.)
  * 2. OData filter and select query support
  * 3. Authentication and session management behavior
  * 4. Response data structures match expected types
@@ -473,13 +471,13 @@ export class AcumaticaClient {
     console.log("[Acumatica Client] testConnection: Authentication successful");
 
     // Try to fetch a simple entity to verify API access
-    // Using Salesperson as it's commonly available and needed for the integration
+    // Using Customer as it's commonly available and needed for the integration
     console.log(
-      "[Acumatica Client] testConnection: Verifying API access with Salesperson endpoint...",
+      "[Acumatica Client] testConnection: Verifying API access with Customer endpoint...",
     );
     try {
-      await this.get<AcumaticaSalesperson[]>("Salesperson", {
-        $select: "SalespersonID",
+      await this.get<AcumaticaCustomer[]>("Customer", {
+        $select: "CustomerID",
         $top: "1",
       });
       console.log(
@@ -487,102 +485,13 @@ export class AcumaticaClient {
       );
     } catch (error) {
       console.error(
-        "[Acumatica Client] testConnection: Failed to access Salesperson endpoint:",
+        "[Acumatica Client] testConnection: Failed to access Customer endpoint:",
         error,
       );
       throw new AcumaticaAPIError(
-        "Authentication succeeded but API access failed. Verify user has permissions to access Salesperson endpoint.",
+        "Authentication succeeded but API access failed. Verify user has permissions to access Customer endpoint.",
         403,
       );
-    }
-  }
-
-  /**
-   * Fetch all active salespeople
-   */
-  async fetchSalespeople(): Promise<AcumaticaSalesperson[]> {
-    console.log(
-      "[Acumatica Client] fetchSalespeople: Fetching active salespeople...",
-    );
-
-    try {
-      // Try with Email and IsActive fields first, filtering for active only
-      const salespeople = await this.get<AcumaticaSalesperson[]>(
-        "Salesperson",
-        {
-          $select: "SalespersonID,Name,Email,IsActive",
-          $filter: "IsActive eq true",
-        },
-      );
-
-      console.log(
-        "[Acumatica Client] fetchSalespeople: Fetched",
-        salespeople.length,
-        "active salespeople",
-      );
-      return salespeople;
-    } catch (error) {
-      console.warn(
-        "[Acumatica Client] fetchSalespeople: Failed with Email/IsActive fields, retrying without Email...",
-        error,
-      );
-
-      // If that fails (Email field might not be available), try without Email but keep IsActive filter
-      try {
-        const salespeople = await this.get<AcumaticaSalesperson[]>(
-          "Salesperson",
-          {
-            $select: "SalespersonID,Name,IsActive",
-            $filter: "IsActive eq true",
-          },
-        );
-
-        // Add empty email to match expected type
-        return salespeople.map((sp) => ({
-          ...sp,
-          Email: { value: null },
-        }));
-      } catch (retryError) {
-        console.warn(
-          "[Acumatica Client] fetchSalespeople: Failed with IsActive filter, trying without filter...",
-          retryError,
-        );
-
-        // Last resort: fetch all salespeople without filter and filter locally
-        try {
-          const allSalespeople = await this.get<AcumaticaSalesperson[]>(
-            "Salesperson",
-            {
-              $select: "SalespersonID,Name,IsActive",
-            },
-          );
-
-          // Filter to active only
-          const activeSalespeople = allSalespeople.filter(
-            (sp) => sp.IsActive?.value === true,
-          );
-
-          console.log(
-            "[Acumatica Client] fetchSalespeople: Filtered",
-            activeSalespeople.length,
-            "active from",
-            allSalespeople.length,
-            "total",
-          );
-
-          // Add empty email to match expected type
-          return activeSalespeople.map((sp) => ({
-            ...sp,
-            Email: { value: null },
-          }));
-        } catch (finalError) {
-          console.error(
-            "[Acumatica Client] fetchSalespeople: All attempts failed:",
-            finalError,
-          );
-          throw finalError;
-        }
-      }
     }
   }
 
@@ -645,7 +554,7 @@ export class AcumaticaClient {
   ): Promise<AcumaticaInvoice | null> {
     const params: Record<string, string> = {
       $filter: `ReferenceNbr eq '${referenceNbr}'`,
-      $expand: "Details,Commissions,FinancialDetails",
+      $expand: "Details,FinancialDetails",
       $top: "1",
     };
 
@@ -695,7 +604,7 @@ export class AcumaticaClient {
 
     const params: Record<string, string> = {
       // Remove $select to get ALL fields
-      $expand: "Details,Commissions,FinancialDetails",
+      $expand: "Details,FinancialDetails",
       $filter: filterParts.join(" and "),
     };
 
