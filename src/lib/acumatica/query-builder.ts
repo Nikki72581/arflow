@@ -231,11 +231,13 @@ export class AcumaticaQueryBuilder {
     }
 
     // Balance filter - only show documents with open balance
+    // Note: Acumatica REST API requires decimal suffix 'm' for numeric comparisons
     if (filterConfig.balanceFilter) {
       const balanceField = filterConfig.balanceFilter.field;
       const balanceOperator = filterConfig.balanceFilter.operator;
       const balanceValue = filterConfig.balanceFilter.value;
-      filters.push(`${balanceField} ${balanceOperator} ${balanceValue}`);
+      // Format as decimal with 'm' suffix for Acumatica OData compatibility
+      filters.push(`${balanceField} ${balanceOperator} ${balanceValue}m`);
     }
 
     // Branch filter
