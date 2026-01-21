@@ -2,12 +2,34 @@
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
-import { UserRole, DocumentType, DocumentStatus, RecordSourceType, SyncStatus, SyncType } from "@prisma/client";
+import {
+  UserRole,
+  DocumentType,
+  DocumentStatus,
+  RecordSourceType,
+  SyncStatus,
+  SyncType,
+} from "@prisma/client";
 import { createAuthenticatedClient } from "@/lib/acumatica/auth";
 import { AcumaticaQueryBuilder } from "@/lib/acumatica/query-builder";
 import { FieldExtractor } from "@/lib/acumatica/field-extractor";
-import type { FieldMappingConfig, FilterConfig } from "@/lib/acumatica/config-types";
+import type {
+  FieldMappingConfig,
+  FilterConfig,
+} from "@/lib/acumatica/config-types";
 import { revalidatePath } from "next/cache";
+
+export interface SyncRecordDetail {
+  documentRef: string;
+  customerId: string;
+  customerName?: string;
+  amount: number;
+  balance: number;
+  date: string;
+  action: "created" | "updated" | "skipped" | "error";
+  reason?: string;
+  arDocumentId?: string;
+}
 
 export interface SyncDocumentsResult {
   success: boolean;
@@ -33,6 +55,24 @@ export interface SyncProgress {
   errors: number;
 }
 
+export interface SyncLogDetails {
+  id: string;
+  syncType: string;
+  status: SyncStatus;
+  startedAt: Date;
+  completedAt: Date | null;
+  invoicesFetched: number;
+  invoicesProcessed: number;
+  invoicesSkipped: number;
+  documentsCreated: number;
+  customersCreated: number;
+  errorsCount: number;
+  createdRecords: SyncRecordDetail[];
+  updatedRecords: SyncRecordDetail[];
+  skippedRecords: SyncRecordDetail[];
+  errorRecords: SyncRecordDetail[];
+}
+
 /**
  * Manually sync documents (invoices/orders) from Acumatica to ARFlow
  */
@@ -41,14 +81,15 @@ export async function syncDocumentsFromAcumatica(
   options?: {
     limit?: number;
     syncType?: SyncType;
-  }
+  },
 ): Promise<SyncDocumentsResult> {
   const user = await getCurrentUser();
   if (!user || user.role !== UserRole.ADMIN) {
     return { success: false, error: "Only administrators can sync documents" };
   }
 
-  let client: Awaited<ReturnType<typeof createAuthenticatedClient>> | null = null;
+  let client: Awaited<ReturnType<typeof createAuthenticatedClient>> | null =
+    null;
   let syncLog: any = null;
 
   try {
@@ -69,19 +110,29 @@ export async function syncDocumentsFromAcumatica(
     }
 
     if (integration.status !== "ACTIVE") {
-      return { success: false, error: "Integration is not active. Please complete setup first." };
+      return {
+        success: false,
+        error: "Integration is not active. Please complete setup first.",
+      };
     }
 
     // Validate configuration
-    const fieldMappings = integration.fieldMappings as FieldMappingConfig | null;
+    const fieldMappings =
+      integration.fieldMappings as FieldMappingConfig | null;
     const filterConfig = integration.filterConfig as FilterConfig | null;
 
     if (!fieldMappings) {
-      return { success: false, error: "Field mappings not configured. Please complete setup." };
+      return {
+        success: false,
+        error: "Field mappings not configured. Please complete setup.",
+      };
     }
 
     if (!filterConfig) {
-      return { success: false, error: "Filter configuration not set. Please complete setup." };
+      return {
+        success: false,
+        error: "Filter configuration not set. Please complete setup.",
+      };
     }
 
     // Create sync log
@@ -130,7 +181,9 @@ export async function syncDocumentsFromAcumatica(
     if (!response.ok) {
       const errorText = await response.text();
       console.error("[Sync] API error response:", errorText);
-      throw new Error(`Failed to fetch documents: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Failed to fetch documents: ${response.status} ${response.statusText}`,
+      );
     }
 
     const data = await response.json();
@@ -151,7 +204,10 @@ export async function syncDocumentsFromAcumatica(
     const customerMappingLookup = new Map<string, string>();
     for (const mapping of integration.customerMappings) {
       if (mapping.customerId && mapping.status === "MATCHED") {
-        customerMappingLookup.set(mapping.acumaticaCustomerId, mapping.customerId);
+        customerMappingLookup.set(
+          mapping.acumaticaCustomerId,
+          mapping.customerId,
+        );
       }
     }
 
@@ -161,17 +217,31 @@ export async function syncDocumentsFromAcumatica(
     let documentsSkipped = 0;
     let customersCreated = 0;
     let errorsCount = 0;
-    const skipDetails: Array<{ invoiceRef: string; reason: string }> = [];
-    const errorDetails: Array<{ invoiceRef: string; error: string }> = [];
+    const createdRecords: SyncRecordDetail[] = [];
+    const updatedRecords: SyncRecordDetail[] = [];
+    const skippedRecords: SyncRecordDetail[] = [];
+    const errorRecords: SyncRecordDetail[] = [];
 
     for (const record of records) {
       try {
         // Extract data using field mappings
-        const extractedData = FieldExtractor.extractInvoiceData(record, fieldMappings);
+        const extractedData = FieldExtractor.extractInvoiceData(
+          record,
+          fieldMappings,
+        );
 
         if (!extractedData.uniqueId) {
           documentsSkipped++;
-          skipDetails.push({ invoiceRef: "unknown", reason: "Missing unique ID" });
+          skippedRecords.push({
+            documentRef: "unknown",
+            customerId: extractedData.customerId || "unknown",
+            customerName: extractedData.customerName,
+            amount: extractedData.amount || 0,
+            balance: extractedData.balance || 0,
+            date: extractedData.date?.toISOString() || new Date().toISOString(),
+            action: "skipped",
+            reason: "Missing unique ID",
+          });
           continue;
         }
 
@@ -192,9 +262,15 @@ export async function syncDocumentsFromAcumatica(
             customerId = existingCustomer.id;
           } else if (integration.unmappedCustomerAction === "SKIP") {
             documentsSkipped++;
-            skipDetails.push({
-              invoiceRef: extractedData.uniqueId,
-              reason: `Unmapped customer: ${extractedData.customerId}`
+            skippedRecords.push({
+              documentRef: extractedData.uniqueId,
+              customerId: extractedData.customerId,
+              customerName: extractedData.customerName,
+              amount: extractedData.amount,
+              balance: extractedData.balance,
+              date: extractedData.date.toISOString(),
+              action: "skipped",
+              reason: `Unmapped customer: ${extractedData.customerId}`,
             });
             continue;
           } else {
@@ -202,7 +278,8 @@ export async function syncDocumentsFromAcumatica(
             const newCustomer = await prisma.customer.create({
               data: {
                 organizationId: integration.organizationId,
-                companyName: extractedData.customerName || extractedData.customerId,
+                companyName:
+                  extractedData.customerName || extractedData.customerId,
                 customerNumber: extractedData.customerId,
                 externalId: extractedData.customerId,
                 externalSystem: "ACUMATICA",
@@ -225,7 +302,8 @@ export async function syncDocumentsFromAcumatica(
               create: {
                 integrationId: integration.id,
                 acumaticaCustomerId: extractedData.customerId,
-                acumaticaCustomerName: extractedData.customerName || extractedData.customerId,
+                acumaticaCustomerName:
+                  extractedData.customerName || extractedData.customerId,
                 customerId: customerId,
                 status: "MATCHED",
                 matchType: "AUTO_PLACEHOLDER",
@@ -242,7 +320,9 @@ export async function syncDocumentsFromAcumatica(
         }
 
         // Determine document type based on entity type
-        const documentType = mapAcumaticaEntityToDocumentType(integration.dataSourceEntity);
+        const documentType = mapAcumaticaEntityToDocumentType(
+          integration.dataSourceEntity,
+        );
 
         // Calculate due date (30 days from document date if not provided)
         const dueDate = new Date(extractedData.date);
@@ -265,18 +345,31 @@ export async function syncDocumentsFromAcumatica(
               totalAmount: extractedData.amount,
               balanceDue: extractedData.balance,
               amountPaid: extractedData.amount - extractedData.balance,
-              status: extractedData.balance <= 0 ? DocumentStatus.PAID :
-                      extractedData.balance < extractedData.amount ? DocumentStatus.PARTIAL :
-                      DocumentStatus.OPEN,
+              status:
+                extractedData.balance <= 0
+                  ? DocumentStatus.PAID
+                  : extractedData.balance < extractedData.amount
+                    ? DocumentStatus.PARTIAL
+                    : DocumentStatus.OPEN,
               description: extractedData.description,
               rawExternalData: record,
               updatedAt: new Date(),
             },
           });
           documentsUpdated++;
+          updatedRecords.push({
+            documentRef: extractedData.uniqueId,
+            customerId: extractedData.customerId,
+            customerName: extractedData.customerName,
+            amount: extractedData.amount,
+            balance: extractedData.balance,
+            date: extractedData.date.toISOString(),
+            action: "updated",
+            arDocumentId: existingDocument.id,
+          });
         } else {
           // Create new document
-          await prisma.arDocument.create({
+          const newDocument = await prisma.arDocument.create({
             data: {
               organizationId: integration.organizationId,
               customerId: customerId,
@@ -289,9 +382,12 @@ export async function syncDocumentsFromAcumatica(
               totalAmount: extractedData.amount,
               amountPaid: extractedData.amount - extractedData.balance,
               balanceDue: extractedData.balance,
-              status: extractedData.balance <= 0 ? DocumentStatus.PAID :
-                      extractedData.balance < extractedData.amount ? DocumentStatus.PARTIAL :
-                      DocumentStatus.OPEN,
+              status:
+                extractedData.balance <= 0
+                  ? DocumentStatus.PAID
+                  : extractedData.balance < extractedData.amount
+                    ? DocumentStatus.PARTIAL
+                    : DocumentStatus.OPEN,
               description: extractedData.description,
               sourceType: RecordSourceType.INTEGRATION,
               externalSystem: "ACUMATICA",
@@ -303,32 +399,73 @@ export async function syncDocumentsFromAcumatica(
             },
           });
           documentsCreated++;
+          createdRecords.push({
+            documentRef: extractedData.uniqueId,
+            customerId: extractedData.customerId,
+            customerName: extractedData.customerName,
+            amount: extractedData.amount,
+            balance: extractedData.balance,
+            date: extractedData.date.toISOString(),
+            action: "created",
+            arDocumentId: newDocument.id,
+          });
         }
       } catch (recordError) {
         console.error("[Sync] Error processing record:", recordError);
         errorsCount++;
-        errorDetails.push({
-          invoiceRef: record?.ReferenceNbr?.value || "unknown",
-          error: recordError instanceof Error ? recordError.message : "Unknown error",
+
+        // Try to extract some info from the raw record for error logging
+        const refNbr =
+          record?.ReferenceNbr?.value || record?.OrderNbr?.value || "unknown";
+        const custId = record?.CustomerID?.value || "unknown";
+        const amount = record?.Amount?.value || record?.OrderTotal?.value || 0;
+        const balance =
+          record?.Balance?.value || record?.UnpaidBalance?.value || 0;
+
+        errorRecords.push({
+          documentRef: refNbr,
+          customerId: custId,
+          amount: amount,
+          balance: balance,
+          date: new Date().toISOString(),
+          action: "error",
+          reason:
+            recordError instanceof Error
+              ? recordError.message
+              : "Unknown error",
         });
       }
     }
 
-    // Update sync log with final results
+    // Update sync log with final results including detailed records
     await prisma.integrationSyncLog.update({
       where: { id: syncLog.id },
       data: {
-        status: errorsCount > 0 && documentsCreated === 0 ? SyncStatus.FAILED :
-                errorsCount > 0 ? SyncStatus.PARTIAL_SUCCESS :
-                SyncStatus.SUCCESS,
+        status:
+          errorsCount > 0 && documentsCreated === 0
+            ? SyncStatus.FAILED
+            : errorsCount > 0
+              ? SyncStatus.PARTIAL_SUCCESS
+              : SyncStatus.SUCCESS,
         completedAt: new Date(),
         invoicesProcessed: documentsCreated + documentsUpdated,
         invoicesSkipped: documentsSkipped,
         documentsCreated: documentsCreated,
         customersCreated: customersCreated,
         errorsCount: errorsCount,
-        skipDetails: skipDetails.length > 0 ? skipDetails : undefined,
-        errorDetails: errorDetails.length > 0 ? errorDetails : undefined,
+        // Store detailed record information as JSON
+        createdRecords:
+          createdRecords.length > 0
+            ? JSON.parse(JSON.stringify(createdRecords))
+            : undefined,
+        skipDetails:
+          skippedRecords.length > 0
+            ? JSON.parse(JSON.stringify(skippedRecords))
+            : undefined,
+        errorDetails:
+          errorRecords.length > 0
+            ? JSON.parse(JSON.stringify(errorRecords))
+            : undefined,
       },
     });
 
@@ -370,10 +507,17 @@ export async function syncDocumentsFromAcumatica(
           status: SyncStatus.FAILED,
           completedAt: new Date(),
           errorsCount: 1,
-          errorDetails: [{
-            invoiceRef: "sync",
-            error: error instanceof Error ? error.message : "Unknown error",
-          }],
+          errorDetails: [
+            {
+              documentRef: "sync",
+              customerId: "N/A",
+              amount: 0,
+              balance: 0,
+              date: new Date().toISOString(),
+              action: "error",
+              reason: error instanceof Error ? error.message : "Unknown error",
+            },
+          ],
         },
       });
     }
@@ -399,7 +543,10 @@ export async function syncDocumentsFromAcumatica(
 /**
  * Get sync history for an integration
  */
-export async function getSyncHistory(integrationId: string, limit: number = 10) {
+export async function getSyncHistory(
+  integrationId: string,
+  limit: number = 10,
+) {
   const user = await getCurrentUser();
   if (!user || user.role !== UserRole.ADMIN) {
     throw new Error("Only administrators can view sync history");
@@ -423,9 +570,52 @@ export async function getSyncHistory(integrationId: string, limit: number = 10) 
 }
 
 /**
+ * Get detailed information about a specific sync operation
+ */
+export async function getSyncDetails(
+  syncLogId: string,
+): Promise<SyncLogDetails | null> {
+  const user = await getCurrentUser();
+  if (!user || user.role !== UserRole.ADMIN) {
+    return null;
+  }
+
+  const log = await prisma.integrationSyncLog.findUnique({
+    where: { id: syncLogId },
+    include: {
+      integration: true,
+    },
+  });
+
+  if (!log || log.integration.organizationId !== user.organizationId) {
+    return null;
+  }
+
+  return {
+    id: log.id,
+    syncType: log.syncType,
+    status: log.status,
+    startedAt: log.startedAt,
+    completedAt: log.completedAt,
+    invoicesFetched: log.invoicesFetched,
+    invoicesProcessed: log.invoicesProcessed,
+    invoicesSkipped: log.invoicesSkipped,
+    documentsCreated: log.documentsCreated,
+    customersCreated: log.customersCreated,
+    errorsCount: log.errorsCount,
+    createdRecords: (log.createdRecords as unknown as SyncRecordDetail[]) || [],
+    updatedRecords: [], // We store updates in createdRecords for now, could separate later
+    skippedRecords: (log.skipDetails as unknown as SyncRecordDetail[]) || [],
+    errorRecords: (log.errorDetails as unknown as SyncRecordDetail[]) || [],
+  };
+}
+
+/**
  * Get the status of a specific sync operation
  */
-export async function getSyncStatus(syncLogId: string): Promise<SyncProgress | null> {
+export async function getSyncStatus(
+  syncLogId: string,
+): Promise<SyncProgress | null> {
   const user = await getCurrentUser();
   if (!user || user.role !== UserRole.ADMIN) {
     return null;
@@ -459,10 +649,16 @@ export async function getSyncStatus(syncLogId: string): Promise<SyncProgress | n
 function mapAcumaticaEntityToDocumentType(entityType: string): DocumentType {
   const normalizedType = entityType.toLowerCase();
 
-  if (normalizedType.includes("invoice") || normalizedType.includes("salesinvoice")) {
+  if (
+    normalizedType.includes("invoice") ||
+    normalizedType.includes("salesinvoice")
+  ) {
     return DocumentType.INVOICE;
   }
-  if (normalizedType.includes("order") || normalizedType.includes("salesorder")) {
+  if (
+    normalizedType.includes("order") ||
+    normalizedType.includes("salesorder")
+  ) {
     return DocumentType.ORDER;
   }
   if (normalizedType.includes("credit")) {
