@@ -106,75 +106,85 @@ export async function syncPaymentToAcumatica(
     // 7. Create authenticated Acumatica client
     const client = await createAuthenticatedClient(integration);
 
-    // 8. Build payment request
-    const paymentRequest: CreatePaymentRequest = {
-      type: "Payment",
-      customerId: payment.customer.externalId,
-      paymentMethod: integration.defaultPaymentMethod,
-      cashAccount: integration.defaultCashAccount,
-      paymentAmount: payment.amount,
-      paymentRef: payment.paymentNumber,
-      applicationDate: payment.paymentDate,
-      description: `Payment from ARFlow - ${payment.paymentNumber}`,
-      documentsToApply:
-        documentsToApply.length > 0 ? documentsToApply : undefined,
-    };
+    try {
+      // 8. Build payment request
+      const paymentRequest: CreatePaymentRequest = {
+        type: "Payment",
+        customerId: payment.customer.externalId,
+        paymentMethod: integration.defaultPaymentMethod,
+        cashAccount: integration.defaultCashAccount,
+        paymentAmount: payment.amount,
+        paymentRef: payment.paymentNumber,
+        applicationDate: payment.paymentDate,
+        description: `Payment from ARFlow - ${payment.paymentNumber}`,
+        documentsToApply:
+          documentsToApply.length > 0 ? documentsToApply : undefined,
+      };
 
-    console.log("[Sync Payment] Creating payment in Acumatica:", {
-      customerId: paymentRequest.customerId,
-      amount: paymentRequest.paymentAmount,
-      documentsCount: documentsToApply.length,
-    });
+      console.log("[Sync Payment] Creating payment in Acumatica:", {
+        customerId: paymentRequest.customerId,
+        amount: paymentRequest.paymentAmount,
+        documentsCount: documentsToApply.length,
+      });
 
-    // 9. Create payment in Acumatica
-    const acumaticaPayment = await createPayment(client, paymentRequest);
+      // 9. Create payment in Acumatica
+      const acumaticaPayment = await createPayment(client, paymentRequest);
 
-    console.log("[Sync Payment] Payment created in Acumatica:", {
-      referenceNbr: acumaticaPayment.ReferenceNbr.value,
-      status: acumaticaPayment.Status.value,
-    });
+      console.log("[Sync Payment] Payment created in Acumatica:", {
+        referenceNbr: acumaticaPayment.ReferenceNbr.value,
+        status: acumaticaPayment.Status.value,
+      });
 
-    // 10. Update payment record with sync status
-    await prisma.customerPayment.update({
-      where: { id: paymentId },
-      data: {
-        acumaticaPaymentRef: acumaticaPayment.ReferenceNbr.value,
-        acumaticaSyncStatus: "synced",
-        acumaticaSyncError: null,
-        acumaticaSyncedAt: new Date(),
-      },
-    });
-
-    // 11. Log successful sync
-    await prisma.integrationSyncLog.create({
-      data: {
-        integrationId: integration.id,
-        syncType: syncType,
-        status: "SUCCESS",
-        startedAt: new Date(),
-        completedAt: new Date(),
-        invoicesFetched: 0,
-        invoicesProcessed: 0,
-        invoicesSkipped: 0,
-        documentsCreated: 0,
-        customersCreated: 0,
-        errorsCount: 0,
-        createdRecords: {
-          paymentId: payment.id,
-          paymentNumber: payment.paymentNumber,
+      // 10. Update payment record with sync status
+      await prisma.customerPayment.update({
+        where: { id: paymentId },
+        data: {
           acumaticaPaymentRef: acumaticaPayment.ReferenceNbr.value,
-          amount: payment.amount,
-          applicationsCount: documentsToApply.length,
+          acumaticaSyncStatus: "synced",
+          acumaticaSyncError: null,
+          acumaticaSyncedAt: new Date(),
         },
-      },
-    });
+      });
 
-    console.log("[Sync Payment] Sync completed successfully");
+      // 11. Log successful sync
+      await prisma.integrationSyncLog.create({
+        data: {
+          integrationId: integration.id,
+          syncType: syncType,
+          status: "SUCCESS",
+          startedAt: new Date(),
+          completedAt: new Date(),
+          invoicesFetched: 0,
+          invoicesProcessed: 0,
+          invoicesSkipped: 0,
+          documentsCreated: 0,
+          customersCreated: 0,
+          errorsCount: 0,
+          createdRecords: {
+            paymentId: payment.id,
+            paymentNumber: payment.paymentNumber,
+            acumaticaPaymentRef: acumaticaPayment.ReferenceNbr.value,
+            amount: payment.amount,
+            applicationsCount: documentsToApply.length,
+          },
+        },
+      });
 
-    return {
-      success: true,
-      acumaticaPaymentRef: acumaticaPayment.ReferenceNbr.value,
-    };
+      console.log("[Sync Payment] Sync completed successfully");
+
+      return {
+        success: true,
+        acumaticaPaymentRef: acumaticaPayment.ReferenceNbr.value,
+      };
+    } finally {
+      // CRITICAL: Always logout to clean up the Acumatica session
+      try {
+        await client.logout();
+        console.log("[Sync Payment] Logged out of Acumatica session");
+      } catch (logoutError) {
+        console.error("[Sync Payment] Failed to logout:", logoutError);
+      }
+    }
   } catch (error) {
     console.error("[Sync Payment] Error syncing payment:", error);
 
