@@ -126,7 +126,7 @@ export default function PreviewPage() {
     setError(null);
 
     try {
-      // Navigate to dashboard after activation
+      // Navigate to the Acumatica dashboard page after activation
       router.push("/dashboard/integrations/acumatica");
     } catch (error) {
       console.error("Failed to activate integration:", error);
