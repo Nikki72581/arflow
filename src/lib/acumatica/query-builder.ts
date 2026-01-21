@@ -230,6 +230,14 @@ export class AcumaticaQueryBuilder {
       filters.push(`${dateField} le datetimeoffset'${endDateWithTime}'`);
     }
 
+    // Balance filter - only show documents with open balance
+    if (filterConfig.balanceFilter) {
+      const balanceField = filterConfig.balanceFilter.field;
+      const balanceOperator = filterConfig.balanceFilter.operator;
+      const balanceValue = filterConfig.balanceFilter.value;
+      filters.push(`${balanceField} ${balanceOperator} ${balanceValue}`);
+    }
+
     // Branch filter
     if (
       filterConfig.branch?.mode === "SELECTED" &&

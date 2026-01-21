@@ -140,6 +140,13 @@ export interface FilterConfig {
     endDate?: string; // ISO date string, null = ongoing
   };
 
+  // Balance filter - only show documents with open balance
+  balanceFilter?: {
+    field: string; // e.g., "Balance" or "UnpaidBalance"
+    operator: "gt" | "ge"; // greater than or greater than/equal
+    value: number; // typically 0 to filter for open balances
+  };
+
   // Branch filter
   branch?: {
     field: string; // e.g., "BranchID"

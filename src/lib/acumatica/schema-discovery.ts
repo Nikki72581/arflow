@@ -147,6 +147,12 @@ export class SchemaDiscoveryService {
           field: "Date",
           startDate: startDate.toISOString().split("T")[0],
         },
+        // Only show orders with an open balance
+        balanceFilter: {
+          field: "UnpaidBalance",
+          operator: "gt",
+          value: 0,
+        },
       };
     }
 
@@ -160,6 +166,12 @@ export class SchemaDiscoveryService {
       dateRange: {
         field: "Date",
         startDate: startDate.toISOString().split("T")[0],
+      },
+      // Only show invoices with an open balance
+      balanceFilter: {
+        field: "Balance",
+        operator: "gt",
+        value: 0,
       },
     };
   }
