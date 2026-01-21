@@ -132,15 +132,16 @@ export class SchemaDiscoveryService {
   static getDefaultFilterConfig(
     entityName: "SalesOrder" | "SalesInvoice",
   ): FilterConfig {
-    // Calculate date range - default to last 1 year
+    // Calculate date range - default to last 3 years for broader initial preview
     const startDate = new Date();
-    startDate.setFullYear(startDate.getFullYear() - 1);
+    startDate.setFullYear(startDate.getFullYear() - 3);
 
     if (entityName === "SalesOrder") {
       return {
         status: {
           field: "Status",
-          allowedValues: ["Open", "Hold", "Credit Hold"],
+          // Include common open statuses for Sales Orders
+          allowedValues: ["Open", "Hold", "Credit Hold", "Pending Approval"],
         },
         dateRange: {
           field: "Date",
@@ -149,11 +150,12 @@ export class SchemaDiscoveryService {
       };
     }
 
-    // SalesInvoice
+    // SalesInvoice - include more status values for broader matching
+    // Acumatica statuses: Open (released with balance), Closed (paid), Balanced, On Hold
     return {
       status: {
         field: "Status",
-        allowedValues: ["Open", "Balanced"],
+        allowedValues: ["Open", "Balanced", "Closed", "On Hold"],
       },
       dateRange: {
         field: "Date",
