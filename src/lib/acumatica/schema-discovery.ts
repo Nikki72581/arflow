@@ -13,6 +13,7 @@ import {
   FieldInfo,
   AcumaticaFieldType,
   FieldMappingConfig,
+  FilterConfig,
   DocumentTypeSelection,
 } from "./config-types";
 import { prisma } from "@/lib/prisma";
@@ -123,6 +124,42 @@ export class SchemaDiscoveryService {
       case "BOTH":
         return ["SalesOrder", "SalesInvoice"];
     }
+  }
+
+  /**
+   * Get default filter config for a document type
+   */
+  static getDefaultFilterConfig(
+    entityName: "SalesOrder" | "SalesInvoice",
+  ): FilterConfig {
+    // Calculate date range - default to last 1 year
+    const startDate = new Date();
+    startDate.setFullYear(startDate.getFullYear() - 1);
+
+    if (entityName === "SalesOrder") {
+      return {
+        status: {
+          field: "Status",
+          allowedValues: ["Open", "Hold", "Credit Hold"],
+        },
+        dateRange: {
+          field: "Date",
+          startDate: startDate.toISOString().split("T")[0],
+        },
+      };
+    }
+
+    // SalesInvoice
+    return {
+      status: {
+        field: "Status",
+        allowedValues: ["Open", "Balanced"],
+      },
+      dateRange: {
+        field: "Date",
+        startDate: startDate.toISOString().split("T")[0],
+      },
+    };
   }
 
   /**

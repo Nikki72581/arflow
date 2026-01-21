@@ -114,7 +114,11 @@ export async function selectDocumentTypes(
         primaryEntity,
       );
 
-      // Update the integration with document type selection, schema, and field mappings
+      // Get default filter config for the primary entity
+      const filterConfig =
+        SchemaDiscoveryService.getDefaultFilterConfig(primaryEntity);
+
+      // Update the integration with document type selection, schema, field mappings, and filter config
       await prisma.acumaticaIntegration.update({
         where: { id: integrationId },
         data: {
@@ -124,6 +128,7 @@ export async function selectDocumentTypes(
           discoveredSchema: enrichedSchema as any,
           schemaLastUpdated: new Date(),
           fieldMappings: fieldMappings as any,
+          filterConfig: filterConfig as any,
         },
       });
 
