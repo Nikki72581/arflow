@@ -237,25 +237,26 @@ export interface OrderApplicationInput {
 }
 
 /**
+ * Allowed Cash Account detail within PaymentMethod entity
+ */
+export interface AcumaticaPaymentMethodCashAccountDetail {
+  CashAccount: AcumaticaValue<string>;
+  Description?: AcumaticaValue<string>;
+  Branch?: AcumaticaValue<string>;
+  UseInAR?: AcumaticaValue<boolean>;
+  ARDefault?: AcumaticaValue<boolean>;
+  PaymentMethod?: AcumaticaValue<string>;
+}
+
+/**
  * Payment Method entity from Acumatica
  * Used for configuring which payment method to use when creating AR Payments
  */
 export interface AcumaticaPaymentMethodEntity {
   PaymentMethodID: AcumaticaValue<string>;
-  Description: AcumaticaValue<string>;
-  IsActive: AcumaticaValue<boolean>;
+  Description?: AcumaticaValue<string>;
+  Active: AcumaticaValue<boolean>;
   UseInAR?: AcumaticaValue<boolean>;
   UseInAP?: AcumaticaValue<boolean>;
-}
-
-/**
- * Cash Account entity from Acumatica
- * Used for configuring which cash account to use when creating AR Payments
- */
-export interface AcumaticaCashAccountEntity {
-  CashAccountCD: AcumaticaValue<string>;
-  Description: AcumaticaValue<string>;
-  Active: AcumaticaValue<boolean>;
-  CashAccountID?: AcumaticaValue<number>;
-  Branch?: AcumaticaValue<string>;
+  AllowedCashAccounts?: AcumaticaPaymentMethodCashAccountDetail[];
 }

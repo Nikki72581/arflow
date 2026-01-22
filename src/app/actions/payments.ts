@@ -1014,6 +1014,64 @@ export async function requeryStripePayment(id: string) {
   }
 }
 
+export async function pollPaymentStatus(paymentId: string, maxAttempts = 5) {
+  const { userId } = await auth();
+  if (!userId) {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { clerkId: userId },
+  });
+
+  if (!user) {
+    return { success: false, error: 'User not found' };
+  }
+
+  let payment = await prisma.customerPayment.findFirst({
+    where: {
+      id: paymentId,
+      organizationId: user.organizationId,
+    },
+  });
+
+  if (!payment) {
+    return { success: false, error: 'Payment not found' };
+  }
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    if (payment.status === 'APPLIED') {
+      return { success: true, status: 'APPLIED' };
+    }
+
+    if (payment.paymentGatewayProvider === 'STRIPE' && payment.gatewayTransactionId) {
+      // Use existing requery function to update payment status
+      const requeryResult = await requeryStripePayment(paymentId);
+      
+      // Check payment status after requery
+      const updatedPayment = await prisma.customerPayment.findUnique({
+        where: { id: paymentId },
+        select: { status: true },
+      });
+
+      if (updatedPayment?.status === 'APPLIED') {
+        return { success: true, status: 'APPLIED' };
+      }
+    }
+
+    // Wait before next attempt (exponential backoff)
+    if (attempt < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
+    }
+  }
+
+  return { 
+    success: false, 
+    status: payment.status,
+    message: 'Payment still processing after maximum attempts'
+  };
+}
+
 export async function getPaymentById(id: string) {
   const { userId } = await auth();
   if (!userId) {

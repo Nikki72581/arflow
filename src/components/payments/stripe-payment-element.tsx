@@ -55,7 +55,23 @@ function StripePaymentElementForm({
     }
 
     if (result.paymentIntent?.status === "succeeded") {
+      // Immediately apply payment or trigger processing
+      try {
+        await fetch('/api/payments/verify-immediate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            paymentIntentId: result.paymentIntent.id,
+          }),
+        });
+      } catch (err) {
+        console.error('Failed to immediately verify payment:', err);
+      }
       onSuccess?.();
+    } else if (result.paymentIntent?.status === "requires_payment_method") {
+      setError("Payment method required. Please try again.");
+    } else if (result.paymentIntent) {
+      setError(`Payment status: ${result.paymentIntent.status}. Please contact support.`);
     }
 
     setSubmitting(false);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -19,10 +19,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertCircle, CheckCircle2, CreditCard, Loader2, RefreshCw } from "lucide-react";
 import {
-  fetchAcumaticaPaymentMethods,
-  fetchAcumaticaCashAccounts,
+  AlertCircle,
+  CheckCircle2,
+  CreditCard,
+  Loader2,
+  RefreshCw,
+} from "lucide-react";
+import {
+  fetchPaymentMethodsWithCashAccounts,
   savePaymentConfiguration,
   type PaymentMethodOption,
   type CashAccountOption,
@@ -44,8 +49,12 @@ export function PaymentConfigForm({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodOption[]>([]);
-  const [cashAccounts, setCashAccounts] = useState<CashAccountOption[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodOption[]>(
+    [],
+  );
+  const [allCashAccounts, setAllCashAccounts] = useState<CashAccountOption[]>(
+    [],
+  );
 
   const [formData, setFormData] = useState({
     defaultPaymentMethod: initialSettings?.defaultPaymentMethod || "",
@@ -53,34 +62,67 @@ export function PaymentConfigForm({
     autoSyncPayments: initialSettings?.autoSyncPayments || false,
   });
 
+  // Filter cash accounts based on selected payment method
+  const filteredCashAccounts = useMemo(() => {
+    if (!formData.defaultPaymentMethod) {
+      return allCashAccounts;
+    }
+    return allCashAccounts.filter(
+      (ca) => ca.paymentMethod === formData.defaultPaymentMethod,
+    );
+  }, [allCashAccounts, formData.defaultPaymentMethod]);
+
   // Fetch options on mount
   useEffect(() => {
     fetchOptions();
   }, [integrationId]);
+
+  // Reset cash account when payment method changes if current selection is invalid
+  useEffect(() => {
+    if (formData.defaultPaymentMethod && formData.defaultCashAccount) {
+      const isValidCashAccount = filteredCashAccounts.some(
+        (ca) => ca.id === formData.defaultCashAccount,
+      );
+      if (!isValidCashAccount) {
+        // Try to select the AR default for this payment method, or clear it
+        const arDefault = filteredCashAccounts.find((ca) => ca.isARDefault);
+        setFormData((prev) => ({
+          ...prev,
+          defaultCashAccount: arDefault?.id || "",
+        }));
+      }
+    }
+  }, [
+    formData.defaultPaymentMethod,
+    formData.defaultCashAccount,
+    filteredCashAccounts,
+  ]);
 
   async function fetchOptions() {
     setFetchingOptions(true);
     setError(null);
 
     try {
-      // Fetch both in parallel
-      const [paymentMethodsResult, cashAccountsResult] = await Promise.all([
-        fetchAcumaticaPaymentMethods(integrationId),
-        fetchAcumaticaCashAccounts(integrationId),
-      ]);
+      const result = await fetchPaymentMethodsWithCashAccounts(integrationId);
 
-      if (!paymentMethodsResult.success) {
-        setError(paymentMethodsResult.error || "Failed to fetch payment methods");
+      if (!result.success || !result.data) {
+        setError(
+          result.error ||
+            "Failed to fetch payment configuration from Acumatica",
+        );
         return;
       }
 
-      if (!cashAccountsResult.success) {
-        setError(cashAccountsResult.error || "Failed to fetch cash accounts");
-        return;
-      }
+      setPaymentMethods(result.data.paymentMethods);
+      setAllCashAccounts(result.data.cashAccounts);
 
-      setPaymentMethods(paymentMethodsResult.paymentMethods || []);
-      setCashAccounts(cashAccountsResult.cashAccounts || []);
+      // If no payment methods have UseInAR enabled, show a helpful message
+      if (result.data.paymentMethods.length === 0) {
+        setError(
+          "No payment methods are configured for AR (Accounts Receivable) in Acumatica. " +
+            "Please enable 'Use in AR' for at least one payment method in Acumatica.",
+        );
+      }
     } catch (err: any) {
       setError(err.message || "Failed to fetch options from Acumatica");
     } finally {
@@ -118,7 +160,8 @@ export function PaymentConfigForm({
     }
   }
 
-  const isConfigured = formData.defaultPaymentMethod && formData.defaultCashAccount;
+  const isConfigured =
+    formData.defaultPaymentMethod && formData.defaultCashAccount;
 
   return (
     <Card>
@@ -130,7 +173,8 @@ export function PaymentConfigForm({
               Payment Sync Configuration
             </CardTitle>
             <CardDescription>
-              Configure how payments are synced to Acumatica as AR Payment records
+              Configure how payments are synced to Acumatica as AR Payment
+              records
             </CardDescription>
           </div>
           {isConfigured && (
@@ -146,7 +190,7 @@ export function PaymentConfigForm({
           {error && (
             <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
               <div className="flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-destructive" />
+                <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0" />
                 <p className="text-sm text-destructive">{error}</p>
               </div>
             </div>
@@ -187,7 +231,8 @@ export function PaymentConfigForm({
 
               <div className="grid gap-2">
                 <Label htmlFor="paymentMethod">
-                  Acumatica Payment Method <span className="text-destructive">*</span>
+                  Acumatica Payment Method{" "}
+                  <span className="text-destructive">*</span>
                 </Label>
                 <Select
                   value={formData.defaultPaymentMethod}
@@ -201,7 +246,7 @@ export function PaymentConfigForm({
                   <SelectContent>
                     {paymentMethods.length === 0 ? (
                       <SelectItem value="_none" disabled>
-                        No payment methods available
+                        No AR payment methods available
                       </SelectItem>
                     ) : (
                       paymentMethods.map((pm) => (
@@ -213,40 +258,57 @@ export function PaymentConfigForm({
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  The payment method to use when creating AR Payment records in Acumatica
+                  The payment method to use when creating AR Payment records in
+                  Acumatica
                 </p>
               </div>
 
               <div className="grid gap-2">
                 <Label htmlFor="cashAccount">
-                  Acumatica Cash Account <span className="text-destructive">*</span>
+                  Acumatica Cash Account{" "}
+                  <span className="text-destructive">*</span>
                 </Label>
                 <Select
                   value={formData.defaultCashAccount}
                   onValueChange={(value) =>
                     setFormData({ ...formData, defaultCashAccount: value })
                   }
+                  disabled={!formData.defaultPaymentMethod}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select cash account" />
+                    <SelectValue
+                      placeholder={
+                        formData.defaultPaymentMethod
+                          ? "Select cash account"
+                          : "Select a payment method first"
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {cashAccounts.length === 0 ? (
+                    {filteredCashAccounts.length === 0 ? (
                       <SelectItem value="_none" disabled>
-                        No cash accounts available
+                        {formData.defaultPaymentMethod
+                          ? "No AR cash accounts for this payment method"
+                          : "Select a payment method first"}
                       </SelectItem>
                     ) : (
-                      cashAccounts.map((ca) => (
-                        <SelectItem key={ca.id} value={ca.id}>
+                      filteredCashAccounts.map((ca) => (
+                        <SelectItem
+                          key={`${ca.paymentMethod}:${ca.id}`}
+                          value={ca.id}
+                        >
                           {ca.id} - {ca.description}
                           {ca.branch && ` (${ca.branch})`}
+                          {ca.isARDefault && " (Default)"}
                         </SelectItem>
                       ))
                     )}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  The cash account to deposit payments into in Acumatica
+                  The cash account to deposit payments into in Acumatica.
+                  {formData.defaultPaymentMethod &&
+                    " Only showing accounts allowed for the selected payment method."}
                 </p>
               </div>
 
@@ -256,7 +318,8 @@ export function PaymentConfigForm({
                     Auto-Sync Payments
                   </Label>
                   <p className="text-sm text-muted-foreground">
-                    Automatically sync payments to Acumatica when they are created
+                    Automatically sync payments to Acumatica when they are
+                    created
                   </p>
                 </div>
                 <Switch
@@ -273,7 +336,9 @@ export function PaymentConfigForm({
           <div className="flex gap-3">
             <Button
               type="submit"
-              disabled={loading || fetchingOptions || !paymentMethods.length || !cashAccounts.length}
+              disabled={
+                loading || fetchingOptions || paymentMethods.length === 0
+              }
             >
               {loading ? (
                 <>

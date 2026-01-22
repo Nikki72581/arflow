@@ -105,18 +105,6 @@ export async function POST(req: Request) {
     // Get webhook secret for this organization
     const stripeIntegration = payment.organization.stripeIntegration;
 
-    if (!stripeIntegration.encryptedWebhookSecret) {
-      console.warn('No webhook secret configured for organization:', payment.organizationId);
-      // For development, you might want to continue without verification
-      // In production, you should return an error here
-      return NextResponse.json(
-        { error: 'Webhook secret not configured' },
-        { status: 400 }
-      );
-    }
-
-    webhookSecret = decryptGatewayCredential(stripeIntegration.encryptedWebhookSecret);
-
     // Initialize Stripe client
     const secretKey = decryptGatewayCredential(stripeIntegration.encryptedSecretKey);
     stripe = new Stripe(secretKey, {
@@ -124,15 +112,35 @@ export async function POST(req: Request) {
       typescript: true,
     });
 
-    // Verify webhook signature
-    try {
-      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-    } catch (err: any) {
-      console.error('Webhook signature verification failed:', err.message);
-      return NextResponse.json(
-        { error: `Webhook signature verification failed: ${err.message}` },
-        { status: 400 }
-      );
+    if (!stripeIntegration.encryptedWebhookSecret) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('No webhook secret configured, proceeding without verification (development only)');
+        webhookSecret = ''; // Skip verification in development
+      } else {
+        return NextResponse.json(
+          { error: 'Webhook secret not configured' },
+          { status: 400 }
+        );
+      }
+    } else {
+      webhookSecret = decryptGatewayCredential(stripeIntegration.encryptedWebhookSecret);
+    }
+
+    // Only verify if webhook secret is available
+    if (webhookSecret) {
+      try {
+        event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+      } catch (err: any) {
+        console.error('Webhook signature verification failed:', err.message);
+        return NextResponse.json(
+          { error: `Webhook signature verification failed: ${err.message}` },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Parse event without verification (development only)
+      console.warn('Processing webhook without signature verification (development mode)');
+      event = JSON.parse(body);
     }
 
     // Log event for debugging
