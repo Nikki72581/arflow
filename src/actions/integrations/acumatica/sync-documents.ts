@@ -394,7 +394,7 @@ export async function syncDocumentsFromAcumatica(
                   : extractedData.balance < extractedData.amount
                     ? DocumentStatus.PARTIAL
                     : DocumentStatus.OPEN,
-              description: extractedData.description,
+              description: extractedData.description || null,
               rawExternalData: record,
               updatedAt: new Date(),
             },
@@ -431,7 +431,7 @@ export async function syncDocumentsFromAcumatica(
                   : extractedData.balance < extractedData.amount
                     ? DocumentStatus.PARTIAL
                     : DocumentStatus.OPEN,
-              description: extractedData.description,
+              description: extractedData.description || null,
               sourceType: RecordSourceType.INTEGRATION,
               externalSystem: "ACUMATICA",
               externalId: extractedData.uniqueId,

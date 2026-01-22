@@ -20,19 +20,12 @@ import {
   AlertCircle,
   ArrowRight,
   ArrowLeft,
-  CreditCard,
   Users,
   UserPlus,
   UserX,
   RefreshCw,
 } from "lucide-react";
 import { getAcumaticaIntegration } from "@/actions/integrations/acumatica/connection";
-import {
-  discoverPaymentMethods,
-  savePaymentMethodFilter,
-  getPaymentMethodFilter,
-  type PaymentMethodInfo,
-} from "@/actions/integrations/acumatica/payment-methods";
 import {
   getCustomerHandlingSettings,
   updateCustomerHandlingSettings,
@@ -44,14 +37,8 @@ export default function FiltersPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [loadingPaymentMethods, setLoadingPaymentMethods] = useState(false);
   const [integrationId, setIntegrationId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  // Payment method state
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodInfo[]>([]);
-  const [paymentMethodMode, setPaymentMethodMode] = useState<"ALL" | "SELECTED">("ALL");
-  const [selectedPaymentMethods, setSelectedPaymentMethods] = useState<string[]>([]);
 
   // Customer handling state
   const [customerAction, setCustomerAction] = useState<UnmappedAction>("AUTO_CREATE");
@@ -75,21 +62,11 @@ export default function FiltersPage() {
 
       setIntegrationId(integration.id);
 
-      // Load current payment method filter
-      const pmFilter = await getPaymentMethodFilter(integration.id);
-      if (pmFilter) {
-        setPaymentMethodMode(pmFilter.mode);
-        setSelectedPaymentMethods(pmFilter.selectedValues);
-      }
-
       // Load customer handling settings
       const customerSettings = await getCustomerHandlingSettings(integration.id);
       if (customerSettings) {
         setCustomerAction(customerSettings.unmappedCustomerAction);
       }
-
-      // Load payment methods from Acumatica
-      await loadPaymentMethods(integration.id);
     } catch (err) {
       console.error("Failed to load data:", err);
       setError("Failed to load integration data");
@@ -98,26 +75,7 @@ export default function FiltersPage() {
     }
   };
 
-  const loadPaymentMethods = async (intId: string) => {
-    setLoadingPaymentMethods(true);
-    try {
-      const methods = await discoverPaymentMethods(intId);
-      setPaymentMethods(methods);
-    } catch (err) {
-      console.error("Failed to load payment methods:", err);
-      // Don't set error - payment methods are optional
-    } finally {
-      setLoadingPaymentMethods(false);
-    }
-  };
-
-  const handlePaymentMethodToggle = (methodId: string) => {
-    setSelectedPaymentMethods((prev) =>
-      prev.includes(methodId)
-        ? prev.filter((id) => id !== methodId)
-        : [...prev, methodId]
-    );
-  };
+  
 
   const handleContinue = async () => {
     if (!integrationId) return;
@@ -126,13 +84,6 @@ export default function FiltersPage() {
     setError(null);
 
     try {
-      // Save payment method filter
-      await savePaymentMethodFilter(
-        integrationId,
-        paymentMethodMode,
-        selectedPaymentMethods
-      );
-
       // Save customer handling settings
       const result = await updateCustomerHandlingSettings(integrationId, {
         unmappedCustomerAction: customerAction,
@@ -189,110 +140,7 @@ export default function FiltersPage() {
         </Alert>
       )}
 
-      {/* Payment Method Filter */}
-      <Card className="border-purple-500/20">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CreditCard className="h-6 w-6 text-indigo-600" />
-              <CardTitle>Payment Method Filter</CardTitle>
-            </div>
-            {integrationId && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => loadPaymentMethods(integrationId)}
-                disabled={loadingPaymentMethods}
-              >
-                {loadingPaymentMethods ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
-                )}
-              </Button>
-            )}
-          </div>
-          <CardDescription>
-            Filter documents by their default payment method. Only documents with
-            the selected payment methods will be imported.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <RadioGroup
-            value={paymentMethodMode}
-            onValueChange={(v) => setPaymentMethodMode(v as "ALL" | "SELECTED")}
-          >
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="ALL" id="pm-all" />
-              <Label htmlFor="pm-all" className="cursor-pointer">
-                Import all documents (no payment method filter)
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="SELECTED" id="pm-selected" />
-              <Label htmlFor="pm-selected" className="cursor-pointer">
-                Only import documents with specific payment methods
-              </Label>
-            </div>
-          </RadioGroup>
 
-          {paymentMethodMode === "SELECTED" && (
-            <div className="mt-4 space-y-3">
-              {loadingPaymentMethods ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : paymentMethods.length === 0 ? (
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    No payment methods found in Acumatica. Make sure payment methods
-                    are configured and marked as "Use in AR".
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <div className="border rounded-lg divide-y">
-                  {paymentMethods.map((method) => (
-                    <div
-                      key={method.id}
-                      className="flex items-center space-x-3 p-3 hover:bg-muted/50 transition-colors"
-                    >
-                      <Checkbox
-                        id={`pm-${method.id}`}
-                        checked={selectedPaymentMethods.includes(method.id)}
-                        onCheckedChange={() => handlePaymentMethodToggle(method.id)}
-                      />
-                      <Label
-                        htmlFor={`pm-${method.id}`}
-                        className="flex-1 cursor-pointer"
-                      >
-                        <div className="font-medium">{method.id}</div>
-                        {method.description && (
-                          <div className="text-sm text-muted-foreground">
-                            {method.description}
-                          </div>
-                        )}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {paymentMethodMode === "SELECTED" &&
-                selectedPaymentMethods.length === 0 &&
-                paymentMethods.length > 0 && (
-                  <Alert className="border-amber-500/30 bg-amber-500/10">
-                    <AlertCircle className="h-4 w-4 text-amber-600" />
-                    <AlertDescription className="text-amber-700 dark:text-amber-400">
-                      Please select at least one payment method, or choose "Import
-                      all documents" to continue.
-                    </AlertDescription>
-                  </Alert>
-                )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Customer Handling */}
       <Card className="border-purple-500/20">
@@ -383,12 +231,7 @@ export default function FiltersPage() {
 
         <Button
           onClick={handleContinue}
-          disabled={
-            saving ||
-            (paymentMethodMode === "SELECTED" &&
-              selectedPaymentMethods.length === 0 &&
-              paymentMethods.length > 0)
-          }
+          disabled={saving}
           className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
         >
           {saving ? (

@@ -153,17 +153,11 @@ export class SchemaDiscoveryService {
           operator: "gt",
           value: 0,
         },
-        // Payment method filter is available for SalesOrder
-        paymentMethod: {
-          field: "PaymentMethod",
-          mode: "ALL" as const,
-        },
-      };
+        };
     }
 
     // SalesInvoice - include more status values for broader matching
     // Acumatica statuses: Open (released with balance), Closed (paid), Balanced, On Hold
-    // Note: SalesInvoice does not have PaymentMethod field, so no payment method filter
     return {
       status: {
         field: "Status",

@@ -240,20 +240,6 @@ export class AcumaticaQueryBuilder {
       filters.push(`${balanceField} ${balanceOperator} ${balanceValue}m`);
     }
 
-    // Payment method filter - only apply to entities that support it
-    // SalesInvoice does not have PaymentMethod field, so skip this filter for it
-    if (
-      filterConfig.paymentMethod?.mode === "SELECTED" &&
-      filterConfig.paymentMethod.selectedValues?.length &&
-      filterConfig.paymentMethod.field
-    ) {
-      const paymentMethodFilters = filterConfig.paymentMethod.selectedValues
-        .map((pm) => `${filterConfig.paymentMethod!.field} eq '${pm}'`)
-        .join(" or ");
-
-      filters.push(`(${paymentMethodFilters})`);
-    }
-
     // Branch filter
     if (
       filterConfig.branch?.mode === "SELECTED" &&

@@ -42,6 +42,31 @@ export interface ExtractedLineData {
 
 export class FieldExtractor {
   /**
+   * Helper method to safely extract value from Acumatica's { value: actualValue } format
+   * Handles empty objects and null/undefined values consistently
+   */
+  private static extractWrappedValue(value: any): any {
+    if (typeof value === "object" && value !== null) {
+      // Handle Acumatica's wrapped format { value: actualValue }
+      if (value.value !== undefined) {
+        return value.value;
+      } else {
+        // Handle empty objects or objects without value
+        return null;
+      }
+    }
+    return value;
+  }
+
+  /**
+   * Helper method to extract string values safely
+   */
+  private static extractStringValue(value: any): string | undefined {
+    const extracted = this.extractWrappedValue(value);
+    return extracted && typeof extracted === "string" ? extracted : undefined;
+  }
+
+  /**
    * Extract invoice data from an Acumatica record using field mappings
    */
   static extractInvoiceData(
@@ -300,12 +325,7 @@ export class FieldExtractor {
       fieldMappings.description.sourceField,
     );
 
-    const description =
-      typeof value === "object" && value?.value !== undefined
-        ? value.value
-        : value;
-
-    return description || undefined;
+    return this.extractStringValue(value);
   }
 
   /**
