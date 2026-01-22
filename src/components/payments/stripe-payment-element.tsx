@@ -12,6 +12,11 @@ import { AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 
+// Version marker for deployment verification
+console.log(
+  "[StripePaymentElement] Module loaded - Version 2.0 with enhanced debugging",
+);
+
 interface StripePaymentElementProps {
   clientSecret: string;
   publishableKey: string;
@@ -64,10 +69,21 @@ function StripePaymentElementForm({
     try {
       // CRITICAL: Submit the elements to ensure payment method is collected
       // This validates the payment details and attaches the payment method
-      const { error: submitError } = await elements.submit();
+      console.log(
+        "[Stripe Payment] Submitting elements to collect payment method...",
+      );
+      const submitResult = await elements.submit();
 
-      if (submitError) {
-        setError(submitError.message || "Please complete all payment details.");
+      console.log("[Stripe Payment] Elements submit result:", {
+        hasError: !!submitResult.error,
+        errorMessage: submitResult.error?.message,
+      });
+
+      if (submitResult.error) {
+        const errorMsg =
+          submitResult.error.message || "Please complete all payment details.";
+        console.error("[Stripe Payment] Submit error:", submitResult.error);
+        setError(errorMsg);
         setSubmitting(false);
         return;
       }
@@ -75,12 +91,23 @@ function StripePaymentElementForm({
       // Now confirm the payment with the collected payment method
       const returnUrl = `${window.location.origin}/payment/success`;
 
+      console.log(
+        "[Stripe Payment] Confirming payment with return URL:",
+        returnUrl,
+      );
+
       const result = await stripe.confirmPayment({
         elements,
         confirmParams: {
           return_url: returnUrl,
         },
         redirect: "if_required",
+      });
+
+      console.log("[Stripe Payment] Confirm result:", {
+        hasError: !!result.error,
+        hasPaymentIntent: !!result.paymentIntent,
+        paymentIntentStatus: result.paymentIntent?.status,
       });
 
       if (result.error) {
@@ -124,12 +151,21 @@ function StripePaymentElementForm({
           // Don't block success - webhook will handle it
         }
 
+        // Add a small delay so logs are visible
+        await new Promise((resolve) => setTimeout(resolve, 500));
         onSuccess?.();
       } else if (result.paymentIntent?.status === "requires_payment_method") {
+        console.error(
+          "[Stripe Payment] CRITICAL: Payment requires payment method - this means the payment method was NOT attached!",
+          result.paymentIntent,
+        );
         setError(
           "Payment method validation failed. Please check your card details and try again.",
         );
         setSubmitting(false);
+
+        // DON'T close dialog - keep it open to see error
+        return;
       } else if (result.paymentIntent?.status === "processing") {
         // Payment is being processed
         console.log(
@@ -138,20 +174,30 @@ function StripePaymentElementForm({
         );
         setError("Payment is being processed. This may take a moment...");
         setSubmitting(false);
+
+        // DON'T close dialog - wait for webhook
+        return;
       } else if (result.paymentIntent) {
-        console.warn(
-          "[Stripe Payment] Unexpected status:",
+        console.error(
+          "[Stripe Payment] UNEXPECTED STATUS:",
           result.paymentIntent.status,
+          result.paymentIntent,
         );
         setError(
           `Payment status: ${result.paymentIntent.status}. Please contact support if you've been charged.`,
         );
         setSubmitting(false);
+
+        // DON'T close dialog
+        return;
       }
     } catch (err) {
       console.error("[Stripe Payment] Unexpected error:", err);
       setError("An unexpected error occurred. Please try again.");
       setSubmitting(false);
+
+      // DON'T close dialog on error
+      return;
     }
   };
 
@@ -183,6 +229,14 @@ function StripePaymentElementForm({
         type="submit"
         disabled={!stripe || !elements || submitting || !elementReady}
         className="w-full"
+        onClick={() => {
+          console.log("[StripePaymentElement] PAY BUTTON CLICKED", {
+            stripe: !!stripe,
+            elements: !!elements,
+            submitting,
+            elementReady,
+          });
+        }}
       >
         {submitting ? (
           <>

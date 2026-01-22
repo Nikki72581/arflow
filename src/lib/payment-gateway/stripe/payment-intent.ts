@@ -101,25 +101,49 @@ export async function createPaymentIntent(
       paymentNumber,
     });
 
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(params.amount * 100),
-      currency: "usd",
-      // Use automatic_payment_methods instead of payment_method_types for Payment Element
-      automatic_payment_methods: {
-        enabled: true,
-        allow_redirects: "never", // Prevent redirects, keep user on page
-      },
-      // Do NOT set confirm: true - let the frontend confirm with elements.submit() + confirmPayment()
-      description,
-      receipt_email: customer.email || undefined,
-      metadata: {
-        organizationId: params.organizationId,
-        customerId: params.customerId,
-        paymentId: payment.id,
-        paymentNumber,
-        documentIds: params.documentIds.join(","),
-      },
-    });
+    // Create PaymentIntent - try automatic_payment_methods first, fallback to payment_method_types
+    let paymentIntent: Stripe.PaymentIntent;
+
+    try {
+      paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(params.amount * 100),
+        currency: "usd",
+        automatic_payment_methods: {
+          enabled: true,
+        },
+        description,
+        receipt_email: customer.email || undefined,
+        metadata: {
+          organizationId: params.organizationId,
+          customerId: params.customerId,
+          paymentId: payment.id,
+          paymentNumber,
+          documentIds: params.documentIds.join(","),
+        },
+      });
+      console.log("[PaymentIntent] Created with automatic_payment_methods");
+    } catch (error: any) {
+      console.warn(
+        "[PaymentIntent] Falling back to payment_method_types:",
+        error.message,
+      );
+
+      paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(params.amount * 100),
+        currency: "usd",
+        payment_method_types: ["card"],
+        description,
+        receipt_email: customer.email || undefined,
+        metadata: {
+          organizationId: params.organizationId,
+          customerId: params.customerId,
+          paymentId: payment.id,
+          paymentNumber,
+          documentIds: params.documentIds.join(","),
+        },
+      });
+      console.log("[PaymentIntent] Created with payment_method_types");
+    }
 
     console.log("[PaymentIntent] Created successfully:", {
       id: paymentIntent.id,
