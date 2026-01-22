@@ -90,10 +90,6 @@ export async function createPaymentIntent(
       amount: Math.round(params.amount * 100),
       currency: 'usd',
       payment_method_types: ['card'], // Explicitly specify card payments
-      automatic_payment_methods: {
-        enabled: true,
-        allow_redirects: 'never', // For direct card payments via Payment Element
-      },
       confirm: false, // Let frontend confirm
       description,
       receipt_email: customer.email || undefined,
