@@ -3,7 +3,11 @@
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { PaymentMethod, PaymentGatewayProvider, PaymentStatus } from "@prisma/client";
+import {
+  PaymentMethod,
+  PaymentGatewayProvider,
+  PaymentStatus,
+} from "@prisma/client";
 import { getDecryptedCredentials } from "./authorize-net";
 import { getDecryptedStripeCredentials } from "./stripe";
 import { processStripePayment } from "@/lib/payment-gateway/stripe/client";
@@ -11,6 +15,63 @@ import {
   handleCheckoutSessionCompleted,
   handleCheckoutSessionExpired,
 } from "@/lib/payment-gateway/stripe/webhook-handlers";
+import { syncPaymentToAcumatica } from "@/actions/integrations/acumatica/sync-payment";
+
+/**
+ * Helper function to automatically sync a payment to Acumatica if auto-sync is enabled
+ * This runs in the background and doesn't block the payment creation
+ */
+async function triggerAutoSyncToAcumatica(
+  paymentId: string,
+  organizationId: string,
+): Promise<void> {
+  try {
+    // Check if Acumatica integration has auto-sync enabled
+    const integration = await prisma.acumaticaIntegration.findUnique({
+      where: { organizationId },
+      select: {
+        id: true,
+        status: true,
+        autoSyncPayments: true,
+        defaultPaymentMethod: true,
+        defaultCashAccount: true,
+      },
+    });
+
+    // Only sync if integration is active, auto-sync is enabled, and payment config is set
+    if (
+      integration &&
+      integration.status === "ACTIVE" &&
+      integration.autoSyncPayments &&
+      integration.defaultPaymentMethod &&
+      integration.defaultCashAccount
+    ) {
+      console.log(
+        "[Auto-Sync] Triggering automatic payment sync to Acumatica for payment:",
+        paymentId,
+      );
+
+      // Run sync in background - don't await to avoid blocking
+      syncPaymentToAcumatica(paymentId, "SCHEDULED")
+        .then((result) => {
+          if (result.success) {
+            console.log(
+              "[Auto-Sync] Payment synced successfully:",
+              result.acumaticaPaymentRef,
+            );
+          } else {
+            console.error("[Auto-Sync] Payment sync failed:", result.error);
+          }
+        })
+        .catch((err) => {
+          console.error("[Auto-Sync] Payment sync error:", err);
+        });
+    }
+  } catch (error) {
+    // Don't throw - just log the error so payment creation isn't affected
+    console.error("[Auto-Sync] Error checking auto-sync settings:", error);
+  }
+}
 
 interface PaymentData {
   customerId: string;
@@ -77,7 +138,10 @@ export async function createManualPayment(data: PaymentData) {
     }
 
     // Calculate total balance due
-    const totalBalanceDue = documents.reduce((sum, doc) => sum + doc.balanceDue, 0);
+    const totalBalanceDue = documents.reduce(
+      (sum, doc) => sum + doc.balanceDue,
+      0,
+    );
 
     if (data.amount > totalBalanceDue) {
       return {
@@ -154,7 +218,12 @@ export async function createManualPayment(data: PaymentData) {
 
     revalidatePath("/dashboard/documents");
     revalidatePath(`/dashboard/clients/${data.customerId}`);
-    data.documentIds.forEach((id) => revalidatePath(`/dashboard/documents/${id}`));
+    data.documentIds.forEach((id) =>
+      revalidatePath(`/dashboard/documents/${id}`),
+    );
+
+    // Trigger auto-sync to Acumatica if enabled (runs in background)
+    triggerAutoSyncToAcumatica(payment.id, user.organizationId);
 
     return {
       success: true,
@@ -165,7 +234,10 @@ export async function createManualPayment(data: PaymentData) {
     };
   } catch (error: any) {
     console.error("Error creating payment:", error);
-    return { success: false, error: error.message || "Failed to create payment" };
+    return {
+      success: false,
+      error: error.message || "Failed to create payment",
+    };
   }
 }
 
@@ -223,7 +295,10 @@ export async function processCreditCardPayment(data: CreditCardPaymentData) {
       return { success: false, error: "One or more documents not found" };
     }
 
-    const totalBalanceDue = documents.reduce((sum, doc) => sum + doc.balanceDue, 0);
+    const totalBalanceDue = documents.reduce(
+      (sum, doc) => sum + doc.balanceDue,
+      0,
+    );
 
     if (data.amount > totalBalanceDue) {
       return {
@@ -260,7 +335,9 @@ export async function processCreditCardPayment(data: CreditCardPaymentData) {
         customerEmail: customer.email || undefined,
       });
     } else if (activeProvider === "STRIPE") {
-      const credentials = await getDecryptedStripeCredentials(user.organizationId);
+      const credentials = await getDecryptedStripeCredentials(
+        user.organizationId,
+      );
       if (!credentials) {
         return {
           success: false,
@@ -371,7 +448,12 @@ export async function processCreditCardPayment(data: CreditCardPaymentData) {
 
     revalidatePath("/dashboard/documents");
     revalidatePath(`/dashboard/clients/${data.customerId}`);
-    data.documentIds.forEach((id) => revalidatePath(`/dashboard/documents/${id}`));
+    data.documentIds.forEach((id) =>
+      revalidatePath(`/dashboard/documents/${id}`),
+    );
+
+    // Trigger auto-sync to Acumatica if enabled (runs in background)
+    triggerAutoSyncToAcumatica(payment.id, user.organizationId);
 
     return {
       success: true,
@@ -383,7 +465,10 @@ export async function processCreditCardPayment(data: CreditCardPaymentData) {
     };
   } catch (error: any) {
     console.error("Error processing credit card payment:", error);
-    return { success: false, error: error.message || "Failed to process payment" };
+    return {
+      success: false,
+      error: error.message || "Failed to process payment",
+    };
   }
 }
 
@@ -456,7 +541,8 @@ async function processAuthorizeNetTransaction(params: {
       cardType: "Visa", // Would be detected from response
       rawResponse: {
         mockResponse: true,
-        message: "This is a placeholder. Implement actual Authorize.net API call.",
+        message:
+          "This is a placeholder. Implement actual Authorize.net API call.",
       },
     };
 
@@ -609,7 +695,9 @@ export async function createStripePaymentIntent(data: {
 
   try {
     // Get Stripe credentials
-    const credentials = await getDecryptedStripeCredentials(user.organizationId);
+    const credentials = await getDecryptedStripeCredentials(
+      user.organizationId,
+    );
     if (!credentials) {
       return {
         success: false,
@@ -617,9 +705,8 @@ export async function createStripePaymentIntent(data: {
       };
     }
 
-    const { createPaymentIntent } = await import(
-      "@/lib/payment-gateway/stripe/payment-intent"
-    );
+    const { createPaymentIntent } =
+      await import("@/lib/payment-gateway/stripe/payment-intent");
 
     const result = await createPaymentIntent(credentials, {
       organizationId: user.organizationId,
@@ -643,7 +730,10 @@ export async function createStripePaymentIntent(data: {
     };
   } catch (error: any) {
     console.error("Error creating Stripe payment intent:", error);
-    return { success: false, error: error.message || "Failed to create payment intent" };
+    return {
+      success: false,
+      error: error.message || "Failed to create payment intent",
+    };
   }
 }
 
@@ -701,7 +791,10 @@ export async function verifyCheckoutSession(sessionId: string) {
     };
   } catch (error: any) {
     console.error("Error verifying checkout session:", error);
-    return { success: false, error: error.message || "Failed to verify payment" };
+    return {
+      success: false,
+      error: error.message || "Failed to verify payment",
+    };
   }
 }
 
@@ -755,7 +848,10 @@ export async function verifyStripePayment(paymentIntentId: string) {
     };
   } catch (error: any) {
     console.error("Error verifying Stripe payment:", error);
-    return { success: false, error: error.message || "Failed to verify payment" };
+    return {
+      success: false,
+      error: error.message || "Failed to verify payment",
+    };
   }
 }
 
@@ -776,7 +872,10 @@ export async function markSessionCancelled(sessionId: string) {
     return { success: true, updated: result.count };
   } catch (error: any) {
     console.error("Error marking session as cancelled:", error);
-    return { success: false, error: error.message || "Failed to update session" };
+    return {
+      success: false,
+      error: error.message || "Failed to update session",
+    };
   }
 }
 
@@ -806,55 +905,98 @@ export async function requeryStripePayment(id: string) {
       return { success: false, error: "Payment not found" };
     }
 
-  if (payment.paymentGatewayProvider !== "STRIPE") {
-    return { success: false, error: "Only Stripe payments can be requeried" };
-  }
-
-  if (!payment.gatewayTransactionId && !payment.stripeCheckoutSessionId) {
-    return { success: false, error: "No Stripe payment found for this record" };
-  }
-
-  const credentials = await getDecryptedStripeCredentials(user.organizationId);
-  if (!credentials) {
-    return { success: false, error: "Stripe is not configured" };
-  }
-
-  if (payment.gatewayTransactionId) {
-    const { retrievePaymentIntent } = await import(
-      "@/lib/payment-gateway/stripe/payment-intent"
-    );
-    const { handlePaymentIntentFailed, handlePaymentIntentSucceeded } = await import(
-      "@/lib/payment-gateway/stripe/webhook-handlers"
-    );
-
-    const paymentIntent = await retrievePaymentIntent(
-      credentials,
-      payment.gatewayTransactionId
-    );
-
-    if (!paymentIntent) {
-      return { success: false, error: "Unable to retrieve Stripe payment intent" };
+    if (payment.paymentGatewayProvider !== "STRIPE") {
+      return { success: false, error: "Only Stripe payments can be requeried" };
     }
 
-    if (paymentIntent.status === "succeeded") {
-      await handlePaymentIntentSucceeded(paymentIntent);
-    } else if (paymentIntent.status === "canceled") {
-      await prisma.customerPayment.update({
-        where: { id: payment.id },
-        data: {
-          status: "VOID",
-          checkoutSessionStatus: paymentIntent.status,
-          gatewayResponse: JSON.parse(JSON.stringify(paymentIntent)),
-        },
-      });
-    } else if (paymentIntent.status === "requires_payment_method") {
-      await handlePaymentIntentFailed(paymentIntent);
+    if (!payment.gatewayTransactionId && !payment.stripeCheckoutSessionId) {
+      return {
+        success: false,
+        error: "No Stripe payment found for this record",
+      };
+    }
+
+    const credentials = await getDecryptedStripeCredentials(
+      user.organizationId,
+    );
+    if (!credentials) {
+      return { success: false, error: "Stripe is not configured" };
+    }
+
+    if (payment.gatewayTransactionId) {
+      const { retrievePaymentIntent } =
+        await import("@/lib/payment-gateway/stripe/payment-intent");
+      const { handlePaymentIntentFailed, handlePaymentIntentSucceeded } =
+        await import("@/lib/payment-gateway/stripe/webhook-handlers");
+
+      const paymentIntent = await retrievePaymentIntent(
+        credentials,
+        payment.gatewayTransactionId,
+      );
+
+      if (!paymentIntent) {
+        return {
+          success: false,
+          error: "Unable to retrieve Stripe payment intent",
+        };
+      }
+
+      if (paymentIntent.status === "succeeded") {
+        await handlePaymentIntentSucceeded(paymentIntent);
+      } else if (paymentIntent.status === "canceled") {
+        await prisma.customerPayment.update({
+          where: { id: payment.id },
+          data: {
+            status: "VOID",
+            checkoutSessionStatus: paymentIntent.status,
+            gatewayResponse: JSON.parse(JSON.stringify(paymentIntent)),
+          },
+        });
+      } else if (paymentIntent.status === "requires_payment_method") {
+        await handlePaymentIntentFailed(paymentIntent);
+      } else {
+        await prisma.customerPayment.update({
+          where: { id: payment.id },
+          data: {
+            checkoutSessionStatus: paymentIntent.status,
+            gatewayResponse: JSON.parse(JSON.stringify(paymentIntent)),
+          },
+        });
+      }
+
+      revalidatePath(`/dashboard/payments/${payment.id}`);
+      revalidatePath("/dashboard/payments");
+
+      return { success: true, status: paymentIntent.status };
+    }
+
+    const { retrieveCheckoutSession } =
+      await import("@/lib/payment-gateway/stripe/checkout");
+
+    const session = await retrieveCheckoutSession(
+      credentials,
+      payment.stripeCheckoutSessionId as string,
+    );
+
+    if (!session) {
+      return { success: false, error: "Unable to retrieve Stripe session" };
+    }
+
+    const sessionStatus = session.status || "open";
+
+    if (sessionStatus === "complete") {
+      await handleCheckoutSessionCompleted(session);
+    } else if (sessionStatus === "expired") {
+      await handleCheckoutSessionExpired(session);
     } else {
       await prisma.customerPayment.update({
         where: { id: payment.id },
         data: {
-          checkoutSessionStatus: paymentIntent.status,
-          gatewayResponse: JSON.parse(JSON.stringify(paymentIntent)),
+          checkoutSessionStatus: sessionStatus,
+          sessionExpiresAt: session.expires_at
+            ? new Date(session.expires_at * 1000)
+            : payment.sessionExpiresAt,
+          gatewayResponse: JSON.parse(JSON.stringify(session)),
         },
       });
     }
@@ -862,48 +1004,13 @@ export async function requeryStripePayment(id: string) {
     revalidatePath(`/dashboard/payments/${payment.id}`);
     revalidatePath("/dashboard/payments");
 
-    return { success: true, status: paymentIntent.status };
-  }
-
-  const { retrieveCheckoutSession } = await import(
-    "@/lib/payment-gateway/stripe/checkout"
-  );
-
-  const session = await retrieveCheckoutSession(
-    credentials,
-    payment.stripeCheckoutSessionId as string
-  );
-
-  if (!session) {
-    return { success: false, error: "Unable to retrieve Stripe session" };
-  }
-
-  const sessionStatus = session.status || "open";
-
-  if (sessionStatus === "complete") {
-    await handleCheckoutSessionCompleted(session);
-  } else if (sessionStatus === "expired") {
-    await handleCheckoutSessionExpired(session);
-  } else {
-    await prisma.customerPayment.update({
-      where: { id: payment.id },
-      data: {
-        checkoutSessionStatus: sessionStatus,
-        sessionExpiresAt: session.expires_at
-          ? new Date(session.expires_at * 1000)
-          : payment.sessionExpiresAt,
-        gatewayResponse: JSON.parse(JSON.stringify(session)),
-      },
-    });
-  }
-
-  revalidatePath(`/dashboard/payments/${payment.id}`);
-  revalidatePath("/dashboard/payments");
-
     return { success: true, status: sessionStatus };
   } catch (error: any) {
     console.error("Error requerying Stripe payment:", error);
-    return { success: false, error: error.message || "Failed to requery Stripe" };
+    return {
+      success: false,
+      error: error.message || "Failed to requery Stripe",
+    };
   }
 }
 
@@ -1041,7 +1148,7 @@ export async function applyPaymentToDocuments(data: {
 
     const alreadyApplied = payment.paymentApplications.reduce(
       (sum, app) => sum + app.amountApplied,
-      0
+      0,
     );
     const remainingAmount = payment.amount - alreadyApplied;
 
@@ -1051,7 +1158,7 @@ export async function applyPaymentToDocuments(data: {
 
     const totalToApply = data.applications.reduce(
       (sum, app) => sum + app.amount,
-      0
+      0,
     );
 
     if (totalToApply > remainingAmount) {
@@ -1140,7 +1247,10 @@ export async function applyPaymentToDocuments(data: {
     return { success: true };
   } catch (error: any) {
     console.error("Error applying payment:", error);
-    return { success: false, error: error.message || "Failed to apply payment" };
+    return {
+      success: false,
+      error: error.message || "Failed to apply payment",
+    };
   }
 }
 
@@ -1196,7 +1306,10 @@ export async function updatePaymentMethodInfo(data: {
     return { success: true };
   } catch (error: any) {
     console.error("Error updating payment:", error);
-    return { success: false, error: error.message || "Failed to update payment" };
+    return {
+      success: false,
+      error: error.message || "Failed to update payment",
+    };
   }
 }
 
@@ -1245,7 +1358,9 @@ export async function voidPayment(id: string, reason?: string) {
         where: { id },
         data: {
           status: "VOID",
-          notes: reason ? `${payment.notes || ""}\n\nVoided: ${reason}`.trim() : payment.notes,
+          notes: reason
+            ? `${payment.notes || ""}\n\nVoided: ${reason}`.trim()
+            : payment.notes,
         },
       });
 

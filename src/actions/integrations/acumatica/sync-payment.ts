@@ -12,6 +12,139 @@ interface SyncPaymentResult {
   error?: string;
 }
 
+interface SyncEligibilityResult {
+  eligible: boolean;
+  reason?: string;
+  details?: {
+    hasIntegration: boolean;
+    integrationActive: boolean;
+    paymentConfigured: boolean;
+    customerHasExternalId: boolean;
+    documentsHaveExternalIds: boolean;
+    documentsWithoutExternalIds?: string[];
+  };
+}
+
+/**
+ * Check if a payment is eligible to be synced to Acumatica
+ * This is useful to show sync status in the UI before attempting sync
+ */
+export async function checkPaymentSyncEligibility(
+  paymentId: string,
+): Promise<SyncEligibilityResult> {
+  try {
+    const payment = await prisma.customerPayment.findUnique({
+      where: { id: paymentId },
+      include: {
+        customer: true,
+        paymentApplications: {
+          include: {
+            arDocument: {
+              select: {
+                id: true,
+                documentNumber: true,
+                externalId: true,
+                externalSystem: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!payment) {
+      return { eligible: false, reason: "Payment not found" };
+    }
+
+    // Check if already synced
+    if (
+      payment.acumaticaSyncStatus === "synced" &&
+      payment.acumaticaPaymentRef
+    ) {
+      return {
+        eligible: false,
+        reason: `Payment already synced to Acumatica (${payment.acumaticaPaymentRef})`,
+      };
+    }
+
+    // Check integration status
+    const integration = await prisma.acumaticaIntegration.findUnique({
+      where: { organizationId: payment.organizationId },
+    });
+
+    const hasIntegration = !!integration;
+    const integrationActive = integration?.status === "ACTIVE";
+    const paymentConfigured = !!(
+      integration?.defaultPaymentMethod && integration?.defaultCashAccount
+    );
+    const customerHasExternalId = !!payment.customer.externalId;
+
+    // Check documents for external IDs
+    const documentsWithoutExternalIds = payment.paymentApplications
+      .filter((app) => !app.arDocument.externalId)
+      .map((app) => app.arDocument.documentNumber);
+    const documentsHaveExternalIds = documentsWithoutExternalIds.length === 0;
+
+    const details = {
+      hasIntegration,
+      integrationActive,
+      paymentConfigured,
+      customerHasExternalId,
+      documentsHaveExternalIds,
+      documentsWithoutExternalIds:
+        documentsWithoutExternalIds.length > 0
+          ? documentsWithoutExternalIds
+          : undefined,
+    };
+
+    // Build reason message
+    if (!hasIntegration) {
+      return {
+        eligible: false,
+        reason: "Acumatica integration not configured",
+        details,
+      };
+    }
+    if (!integrationActive) {
+      return {
+        eligible: false,
+        reason: "Acumatica integration is not active",
+        details,
+      };
+    }
+    if (!paymentConfigured) {
+      return {
+        eligible: false,
+        reason:
+          "Payment method and cash account not configured in Acumatica settings",
+        details,
+      };
+    }
+    if (!customerHasExternalId) {
+      return {
+        eligible: false,
+        reason: `Customer "${payment.customer.companyName}" is not linked to an Acumatica customer`,
+        details,
+      };
+    }
+    if (!documentsHaveExternalIds && payment.paymentApplications.length > 0) {
+      return {
+        eligible: false,
+        reason: `${documentsWithoutExternalIds.length} document(s) are not synced from Acumatica: ${documentsWithoutExternalIds.join(", ")}`,
+        details,
+      };
+    }
+
+    return { eligible: true, details };
+  } catch (error) {
+    console.error("[Sync Payment] Error checking eligibility:", error);
+    return {
+      eligible: false,
+      reason: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
 /**
  * Sync a CustomerPayment record to Acumatica
  * Creates an AR Payment in Acumatica and updates the payment record with sync status
@@ -85,20 +218,25 @@ export async function syncPaymentToAcumatica(
       );
     }
 
-    // 6. Build payment applications array
+    // 6. Validate and build payment applications array
+    // First, check which documents have Acumatica references
+    const documentsWithoutRefs = payment.paymentApplications.filter(
+      (app) => !app.arDocument.externalId,
+    );
+
+    if (documentsWithoutRefs.length > 0) {
+      const missingDocs = documentsWithoutRefs
+        .map((app) => app.arDocument.documentNumber)
+        .join(", ");
+      throw new Error(
+        `Cannot sync payment: ${documentsWithoutRefs.length} document(s) are not linked to Acumatica: ${missingDocs}. Please sync documents from Acumatica first.`,
+      );
+    }
+
     const documentsToApply = payment.paymentApplications.map((app) => {
-      // Get Acumatica reference number from document
-      const acumaticaRefNbr = app.arDocument.externalId;
-
-      if (!acumaticaRefNbr) {
-        throw new Error(
-          `Document ${app.arDocument.documentNumber} does not have an Acumatica reference number`,
-        );
-      }
-
       return {
         docType: mapDocumentType(app.arDocument.documentType),
-        referenceNbr: acumaticaRefNbr,
+        referenceNbr: app.arDocument.externalId as string,
         amountPaid: app.amountApplied,
       };
     });

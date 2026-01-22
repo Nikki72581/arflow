@@ -624,6 +624,7 @@ model AcumaticaIntegration {
   // Payment Configuration
   defaultCashAccount   String? // Default cash account for payments (e.g., "10200")
   defaultPaymentMethod String? // Default payment method code (e.g., "DEMOCC", "CHECK")
+  autoSyncPayments     Boolean @default(false) // Automatically sync payments to Acumatica when created
 
   // Sync Schedule
   syncFrequency     SyncFrequency @default(MANUAL)

@@ -35,7 +35,15 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { getAcumaticaIntegration } from "@/actions/integrations/acumatica/connection";
-import { syncDocumentsFromAcumatica, getSyncHistory } from "@/actions/integrations/acumatica/sync-documents";
+import {
+  syncDocumentsFromAcumatica,
+  getSyncHistory,
+} from "@/actions/integrations/acumatica/sync-documents";
+import {
+  getPaymentConfigSettings,
+  type PaymentConfigSettings,
+} from "@/actions/integrations/acumatica/payment-config";
+import { PaymentConfigForm } from "@/components/integrations/acumatica/payment-config-form";
 import type { SyncStatus } from "@prisma/client";
 
 interface SyncLog {
@@ -68,6 +76,8 @@ export default function AcumaticaDashboardPage() {
   const [syncing, setSyncing] = useState(false);
   const [integration, setIntegration] = useState<Integration | null>(null);
   const [syncHistory, setSyncHistory] = useState<SyncLog[]>([]);
+  const [paymentConfig, setPaymentConfig] =
+    useState<PaymentConfigSettings | null>(null);
   const [syncResult, setSyncResult] = useState<{
     success: boolean;
     message: string;
@@ -97,9 +107,13 @@ export default function AcumaticaDashboardPage() {
 
       setIntegration(integrationData as Integration);
 
-      // Load sync history
-      const history = await getSyncHistory(integrationData.id, 10);
+      // Load sync history and payment config in parallel
+      const [history, paymentSettings] = await Promise.all([
+        getSyncHistory(integrationData.id, 10),
+        getPaymentConfigSettings(integrationData.id),
+      ]);
       setSyncHistory(history as SyncLog[]);
+      setPaymentConfig(paymentSettings);
     } catch (err) {
       console.error("Failed to load data:", err);
       setError("Failed to load integration data");
@@ -215,7 +229,9 @@ export default function AcumaticaDashboardPage() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => router.push("/dashboard/integrations/acumatica/setup")}
+            onClick={() =>
+              router.push("/dashboard/integrations/acumatica/setup")
+            }
           >
             <Settings className="mr-2 h-4 w-4" />
             Settings
@@ -276,7 +292,9 @@ export default function AcumaticaDashboardPage() {
               </div>
             </div>
             <div className="p-3 rounded-lg border bg-muted/50">
-              <div className="text-xs text-muted-foreground mb-1">Last Sync</div>
+              <div className="text-xs text-muted-foreground mb-1">
+                Last Sync
+              </div>
               <div className="text-sm">
                 {integration.lastSyncAt
                   ? new Date(integration.lastSyncAt).toLocaleString()
@@ -334,11 +352,15 @@ export default function AcumaticaDashboardPage() {
                       </div>
                       <div className="flex items-center gap-2 text-sm">
                         <FileText className="h-4 w-4" />
-                        <span>Created: {syncResult.summary.documentsCreated}</span>
+                        <span>
+                          Created: {syncResult.summary.documentsCreated}
+                        </span>
                       </div>
                       <div className="flex items-center gap-2 text-sm">
                         <RefreshCw className="h-4 w-4" />
-                        <span>Updated: {syncResult.summary.documentsUpdated}</span>
+                        <span>
+                          Updated: {syncResult.summary.documentsUpdated}
+                        </span>
                       </div>
                       <div className="flex items-center gap-2 text-sm">
                         <Users className="h-4 w-4" />
@@ -348,7 +370,9 @@ export default function AcumaticaDashboardPage() {
                       </div>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Clock className="h-4 w-4" />
-                        <span>Skipped: {syncResult.summary.documentsSkipped}</span>
+                        <span>
+                          Skipped: {syncResult.summary.documentsSkipped}
+                        </span>
                       </div>
                       {syncResult.summary.errors > 0 && (
                         <div className="flex items-center gap-2 text-sm text-red-600">
@@ -398,6 +422,14 @@ export default function AcumaticaDashboardPage() {
         </CardContent>
       </Card>
 
+      {/* Payment Configuration */}
+      {integration.status === "ACTIVE" && (
+        <PaymentConfigForm
+          integrationId={integration.id}
+          initialSettings={paymentConfig}
+        />
+      )}
+
       {/* Sync History */}
       <Card className="border-purple-500/20">
         <CardHeader>
@@ -405,9 +437,7 @@ export default function AcumaticaDashboardPage() {
             <Clock className="h-5 w-5 text-indigo-600" />
             <CardTitle>Sync History</CardTitle>
           </div>
-          <CardDescription>
-            Recent synchronization activity
-          </CardDescription>
+          <CardDescription>Recent synchronization activity</CardDescription>
         </CardHeader>
         <CardContent>
           {syncHistory.length === 0 ? (
@@ -453,7 +483,9 @@ export default function AcumaticaDashboardPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         {log.errorsCount > 0 ? (
-                          <span className="text-red-600">{log.errorsCount}</span>
+                          <span className="text-red-600">
+                            {log.errorsCount}
+                          </span>
                         ) : (
                           <span className="text-muted-foreground">0</span>
                         )}

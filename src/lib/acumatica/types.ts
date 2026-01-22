@@ -235,3 +235,27 @@ export interface OrderApplicationInput {
   orderNbr: string;
   amountPaid?: number;
 }
+
+/**
+ * Payment Method entity from Acumatica
+ * Used for configuring which payment method to use when creating AR Payments
+ */
+export interface AcumaticaPaymentMethodEntity {
+  PaymentMethodID: AcumaticaValue<string>;
+  Description: AcumaticaValue<string>;
+  IsActive: AcumaticaValue<boolean>;
+  UseInAR?: AcumaticaValue<boolean>;
+  UseInAP?: AcumaticaValue<boolean>;
+}
+
+/**
+ * Cash Account entity from Acumatica
+ * Used for configuring which cash account to use when creating AR Payments
+ */
+export interface AcumaticaCashAccountEntity {
+  CashAccountCD: AcumaticaValue<string>;
+  Description: AcumaticaValue<string>;
+  Active: AcumaticaValue<boolean>;
+  CashAccountID?: AcumaticaValue<number>;
+  Branch?: AcumaticaValue<string>;
+}

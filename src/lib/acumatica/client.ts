@@ -8,6 +8,8 @@ import {
   AcumaticaCompany,
   AcumaticaErrorResponse,
   InvoiceQueryFilters,
+  AcumaticaPaymentMethodEntity,
+  AcumaticaCashAccountEntity,
 } from "./types";
 
 /**
@@ -510,6 +512,28 @@ export class AcumaticaClient {
   async fetchItemClasses(): Promise<AcumaticaItemClass[]> {
     return this.get<AcumaticaItemClass[]>("ItemClass", {
       $select: "ClassID,Description",
+    });
+  }
+
+  /**
+   * Fetch payment methods available for AR (Accounts Receivable)
+   * Used for configuring which payment method to use when syncing payments to Acumatica
+   */
+  async fetchPaymentMethods(): Promise<AcumaticaPaymentMethodEntity[]> {
+    return this.get<AcumaticaPaymentMethodEntity[]>("PaymentMethod", {
+      $select: "PaymentMethodID,Description,IsActive,UseInAR",
+      $filter: "IsActive eq true",
+    });
+  }
+
+  /**
+   * Fetch cash accounts available in Acumatica
+   * Used for configuring which cash account to use when syncing payments to Acumatica
+   */
+  async fetchCashAccounts(): Promise<AcumaticaCashAccountEntity[]> {
+    return this.get<AcumaticaCashAccountEntity[]>("CashAccount", {
+      $select: "CashAccountCD,Description,Active,Branch",
+      $filter: "Active eq true",
     });
   }
 
