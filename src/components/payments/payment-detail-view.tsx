@@ -5,7 +5,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardAction,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -27,11 +33,15 @@ import {
   Phone,
   ShieldCheck,
   RefreshCw,
+  CloudUpload,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { VoidPaymentDialog } from "./void-payment-dialog";
 import { PaymentExportButton } from "./payment-export-button";
 import { PaymentApplyDialog } from "./payment-apply-dialog";
 import { PaymentCheckInfoDialog } from "./payment-check-info-dialog";
+import { SyncPaymentDialog } from "./sync-payment-dialog";
 import { requeryStripePayment } from "@/app/actions/payments";
 import { useAppToast } from "@/hooks/use-app-toast";
 
@@ -76,7 +86,7 @@ export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
 
   const totalApplied = payment.paymentApplications.reduce(
     (sum: number, application: any) => sum + application.amountApplied,
-    0
+    0,
   );
   const remainingAmount = Math.max(payment.amount - totalApplied, 0);
 
@@ -95,7 +105,10 @@ export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
       toast.success("Stripe requery complete", `Status: ${result.status}`);
       router.refresh();
     } catch (error: any) {
-      toast.error("Stripe requery failed", error?.message || "Please try again.");
+      toast.error(
+        "Stripe requery failed",
+        error?.message || "Please try again.",
+      );
     } finally {
       setRequerying(false);
     }
@@ -132,9 +145,22 @@ export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
               onClick={handleRequeryStripe}
               disabled={requerying}
             >
-              <RefreshCw className={requerying ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"} />
+              <RefreshCw
+                className={
+                  requerying ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-4 w-4"
+                }
+              />
               {requerying ? "Requerying..." : "Requery Stripe"}
             </Button>
+          )}
+          {payment.status === "APPLIED" && (
+            <SyncPaymentDialog
+              paymentId={payment.id}
+              paymentNumber={payment.paymentNumber}
+              amount={payment.amount}
+              customerName={payment.customer.companyName}
+              currentSyncStatus={payment.acumaticaSyncStatus}
+            />
           )}
           {payment.status !== "VOID" && (
             <PaymentCheckInfoDialog
@@ -195,7 +221,9 @@ export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
               <CreditCard className="h-5 w-5 text-muted-foreground mt-0.5" />
               <div>
                 <p className="text-sm text-muted-foreground">Payment Method</p>
-                <p className="font-medium">{getPaymentMethodDisplay(payment.paymentMethod)}</p>
+                <p className="font-medium">
+                  {getPaymentMethodDisplay(payment.paymentMethod)}
+                </p>
               </div>
             </div>
 
@@ -203,7 +231,9 @@ export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
               <div className="flex items-start gap-3">
                 <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Reference Number</p>
+                  <p className="text-sm text-muted-foreground">
+                    Reference Number
+                  </p>
                   <p className="font-medium">{payment.referenceNumber}</p>
                 </div>
               </div>
@@ -215,14 +245,20 @@ export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
                 <div className="border-t pt-4">
                   <div className="flex items-center gap-2 mb-3">
                     <ShieldCheck className="h-5 w-5 text-muted-foreground" />
-                    <p className="text-sm font-medium text-muted-foreground">Gateway Details</p>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Gateway Details
+                    </p>
                   </div>
                 </div>
 
                 {payment.gatewayTransactionId && (
                   <div className="pl-7">
-                    <p className="text-sm text-muted-foreground">Transaction ID</p>
-                    <p className="font-mono text-sm">{payment.gatewayTransactionId}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Transaction ID
+                    </p>
+                    <p className="font-mono text-sm">
+                      {payment.gatewayTransactionId}
+                    </p>
                   </div>
                 )}
 
@@ -236,7 +272,9 @@ export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
                 {payment.last4Digits && (
                   <div className="pl-7">
                     <p className="text-sm text-muted-foreground">Card Number</p>
-                    <p className="font-medium">•••• •••• •••• {payment.last4Digits}</p>
+                    <p className="font-medium">
+                      •••• •••• •••• {payment.last4Digits}
+                    </p>
                   </div>
                 )}
 
@@ -244,7 +282,9 @@ export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
                   <div className="pl-7">
                     <p className="text-sm text-muted-foreground">Provider</p>
                     <p className="font-medium">
-                      {payment.paymentGatewayProvider === "STRIPE" ? "Stripe" : "Authorize.net"}
+                      {payment.paymentGatewayProvider === "STRIPE"
+                        ? "Stripe"
+                        : "Authorize.net"}
                     </p>
                   </div>
                 )}
@@ -265,32 +305,117 @@ export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
 
                     {payment.checkoutSessionStatus && (
                       <div className="pl-7">
-                        <p className="text-sm text-muted-foreground">Payment Status</p>
-                        <p className="font-medium">{payment.checkoutSessionStatus}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Payment Status
+                        </p>
+                        <p className="font-medium">
+                          {payment.checkoutSessionStatus}
+                        </p>
                       </div>
                     )}
 
                     {payment.gatewayTransactionId && (
                       <div className="pl-7">
-                        <p className="text-sm text-muted-foreground">Payment Intent</p>
-                        <p className="font-mono text-sm">{payment.gatewayTransactionId}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Payment Intent
+                        </p>
+                        <p className="font-mono text-sm">
+                          {payment.gatewayTransactionId}
+                        </p>
                       </div>
                     )}
 
                     {payment.stripeCheckoutSessionId && (
                       <div className="pl-7">
-                        <p className="text-sm text-muted-foreground">Checkout Session</p>
-                        <p className="font-mono text-sm">{payment.stripeCheckoutSessionId}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Checkout Session
+                        </p>
+                        <p className="font-mono text-sm">
+                          {payment.stripeCheckoutSessionId}
+                        </p>
                       </div>
                     )}
 
                     {payment.sessionExpiresAt && (
                       <div className="pl-7">
-                        <p className="text-sm text-muted-foreground">Session Expires</p>
-                        <p className="font-medium">{formatDate(payment.sessionExpiresAt)}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Session Expires
+                        </p>
+                        <p className="font-medium">
+                          {formatDate(payment.sessionExpiresAt)}
+                        </p>
                       </div>
                     )}
                   </>
+                )}
+              </>
+            )}
+
+            {/* Acumatica Sync Status */}
+            {(payment.acumaticaSyncStatus ||
+              payment.acumaticaPaymentRef ||
+              payment.acumaticaSyncError) && (
+              <>
+                <div className="border-t pt-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <CloudUpload className="h-5 w-5 text-muted-foreground" />
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Acumatica Sync
+                    </p>
+                  </div>
+                </div>
+
+                {payment.acumaticaSyncStatus && (
+                  <div className="pl-7">
+                    <p className="text-sm text-muted-foreground">Sync Status</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      {payment.acumaticaSyncStatus === "synced" && (
+                        <Badge variant="success" className="text-xs">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Synced
+                        </Badge>
+                      )}
+                      {payment.acumaticaSyncStatus === "pending" && (
+                        <Badge variant="warning" className="text-xs">
+                          <RefreshCw className="h-3 w-3 mr-1" />
+                          Pending
+                        </Badge>
+                      )}
+                      {payment.acumaticaSyncStatus === "failed" && (
+                        <Badge variant="destructive" className="text-xs">
+                          <AlertCircle className="h-3 w-3 mr-1" />
+                          Failed
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {payment.acumaticaPaymentRef && (
+                  <div className="pl-7 mt-3">
+                    <p className="text-sm text-muted-foreground">
+                      AR Payment Number
+                    </p>
+                    <p className="font-medium">{payment.acumaticaPaymentRef}</p>
+                  </div>
+                )}
+
+                {payment.acumaticaSyncedAt && (
+                  <div className="pl-7 mt-3">
+                    <p className="text-sm text-muted-foreground">Synced At</p>
+                    <p className="font-medium">
+                      {formatDate(payment.acumaticaSyncedAt)}
+                    </p>
+                  </div>
+                )}
+
+                {payment.acumaticaSyncError && (
+                  <div className="pl-7 mt-3">
+                    <p className="text-sm text-muted-foreground">Sync Error</p>
+                    <p className="text-sm text-destructive">
+                      {payment.acumaticaSyncError}
+                    </p>
+                  </div>
                 )}
               </>
             )}
@@ -402,13 +527,19 @@ export function PaymentDetailView({ payment }: PaymentDetailViewProps) {
               <TableBody>
                 {payment.paymentApplications.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell
+                      colSpan={5}
+                      className="text-center py-8 text-muted-foreground"
+                    >
                       No documents associated with this payment
                     </TableCell>
                   </TableRow>
                 ) : (
                   payment.paymentApplications.map((application: any) => (
-                    <TableRow key={application.id} className="hover:bg-green-500/5">
+                    <TableRow
+                      key={application.id}
+                      className="hover:bg-green-500/5"
+                    >
                       <TableCell>
                         <Link
                           href={`/dashboard/documents/${application.arDocument.id}`}

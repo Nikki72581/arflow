@@ -42,7 +42,9 @@ export function PaymentsTable({ searchParams }: PaymentsTableProps) {
   const currentPage = Number(params.get("page")) || 1;
   const pageSize = Number(params.get("pageSize")) || 25;
   const status = params.get("status") as PaymentStatus | undefined;
-  const paymentMethod = params.get("paymentMethod") as PaymentMethod | undefined;
+  const paymentMethod = params.get("paymentMethod") as
+    | PaymentMethod
+    | undefined;
   const search = params.get("search") || "";
 
   useEffect(() => {
@@ -116,7 +118,11 @@ export function PaymentsTable({ searchParams }: PaymentsTableProps) {
     }
   };
 
-  const getPaymentMethodDisplay = (method: PaymentMethod, last4?: string | null, cardType?: string | null) => {
+  const getPaymentMethodDisplay = (
+    method: PaymentMethod,
+    last4?: string | null,
+    cardType?: string | null,
+  ) => {
     switch (method) {
       case "CREDIT_CARD":
         if (cardType && last4) {
@@ -170,10 +176,7 @@ export function PaymentsTable({ searchParams }: PaymentsTableProps) {
               className="pl-10"
             />
           </div>
-          <Select
-            value={status || "all"}
-            onValueChange={handleStatusChange}
-          >
+          <Select value={status || "all"} onValueChange={handleStatusChange}>
             <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
@@ -213,20 +216,28 @@ export function PaymentsTable({ searchParams }: PaymentsTableProps) {
                 <TableHead>Date</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="hidden sm:table-cell">Payment Method</TableHead>
+                <TableHead className="hidden sm:table-cell">
+                  Payment Method
+                </TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="hidden md:table-cell">
+                  Acumatica
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
+                  <TableCell colSpan={7} className="text-center py-8">
                     Loading payments...
                   </TableCell>
                 </TableRow>
               ) : payments.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell
+                    colSpan={7}
+                    className="text-center py-8 text-muted-foreground"
+                  >
                     No payments found
                   </TableCell>
                 </TableRow>
@@ -263,7 +274,7 @@ export function PaymentsTable({ searchParams }: PaymentsTableProps) {
                           {getPaymentMethodDisplay(
                             payment.paymentMethod,
                             payment.last4Digits,
-                            payment.cardType
+                            payment.cardType,
                           )}
                         </span>
                       </div>
@@ -272,6 +283,26 @@ export function PaymentsTable({ searchParams }: PaymentsTableProps) {
                       <Badge variant={getStatusVariant(payment.status)}>
                         {payment.status}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {payment.acumaticaSyncStatus === "synced" && (
+                        <Badge variant="success" className="text-xs">
+                          Synced
+                        </Badge>
+                      )}
+                      {payment.acumaticaSyncStatus === "pending" && (
+                        <Badge variant="warning" className="text-xs">
+                          Pending
+                        </Badge>
+                      )}
+                      {payment.acumaticaSyncStatus === "failed" && (
+                        <Badge variant="destructive" className="text-xs">
+                          Failed
+                        </Badge>
+                      )}
+                      {!payment.acumaticaSyncStatus && (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
