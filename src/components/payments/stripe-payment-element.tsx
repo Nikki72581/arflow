@@ -205,7 +205,7 @@ function StripePaymentElementForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="space-y-4">
       <PaymentElement
         options={{ layout: "tabs" }}
         onReady={() => {
@@ -229,16 +229,19 @@ function StripePaymentElementForm({
         </div>
       )}
       <Button
-        type="submit"
+        type="button"
         disabled={!stripe || !elements || submitting || !elementReady}
         className="w-full"
-        onClick={() => {
+        onClick={(e) => {
           console.log("[StripePaymentElement] PAY BUTTON CLICKED", {
             stripe: !!stripe,
             elements: !!elements,
             submitting,
             elementReady,
           });
+          e.preventDefault();
+          e.stopPropagation();
+          handleSubmit(e as any);
         }}
       >
         {submitting ? (
@@ -255,7 +258,7 @@ function StripePaymentElementForm({
           `Pay ${formatCurrency(amount)}`
         )}
       </Button>
-    </form>
+    </div>
   );
 }
 
