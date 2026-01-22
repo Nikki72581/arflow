@@ -27,13 +27,35 @@ function StripePaymentElementForm({
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [elementReady, setElementReady] = useState(false);
+
+  useEffect(() => {
+    console.log("[StripePaymentElement] Component mounted", {
+      stripeLoaded: !!stripe,
+      elementsLoaded: !!elements,
+      amount,
+    });
+  }, [stripe, elements, amount]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
 
+    console.log("[StripePaymentElement] Form submitted", {
+      stripeLoaded: !!stripe,
+      elementsLoaded: !!elements,
+      elementReady,
+      amount,
+    });
+
     if (!stripe || !elements) {
-      setError("Payment system not initialized. Please refresh and try again.");
+      const errorMsg =
+        "Payment system not initialized. Please refresh and try again.";
+      console.error("[StripePaymentElement] Missing stripe or elements:", {
+        stripe: !!stripe,
+        elements: !!elements,
+      });
+      setError(errorMsg);
       return;
     }
 
@@ -135,18 +157,42 @@ function StripePaymentElementForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <PaymentElement options={{ layout: "tabs" }} />
+      <PaymentElement
+        options={{ layout: "tabs" }}
+        onReady={() => {
+          console.log("[StripePaymentElement] PaymentElement ready");
+          setElementReady(true);
+        }}
+        onChange={(event) => {
+          console.log("[StripePaymentElement] PaymentElement changed:", {
+            complete: event.complete,
+            empty: event.empty,
+          });
+          if (event.complete) {
+            setError(null);
+          }
+        }}
+      />
       {error && (
         <div className="flex items-center gap-2 text-sm text-destructive">
           <AlertCircle className="h-4 w-4" />
           {error}
         </div>
       )}
-      <Button type="submit" disabled={!stripe || submitting} className="w-full">
+      <Button
+        type="submit"
+        disabled={!stripe || !elements || submitting || !elementReady}
+        className="w-full"
+      >
         {submitting ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Processing...
+          </>
+        ) : !elementReady ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Loading payment form...
           </>
         ) : (
           `Pay ${formatCurrency(amount)}`
@@ -162,20 +208,70 @@ export function StripePaymentElement({
   amount,
   onSuccess,
 }: StripePaymentElementProps) {
-  const stripePromise = useMemo<Promise<Stripe | null>>(
-    () => loadStripe(publishableKey),
-    [publishableKey],
-  );
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const stripePromise = useMemo<Promise<Stripe | null>>(() => {
+    console.log(
+      "[StripePaymentElement] Loading Stripe with publishable key:",
+      publishableKey ? `${publishableKey.substring(0, 20)}...` : "MISSING",
+    );
+
+    if (!publishableKey) {
+      setLoadError("Stripe publishable key is missing");
+      return Promise.resolve(null);
+    }
+
+    return loadStripe(publishableKey)
+      .then((stripe) => {
+        console.log("[StripePaymentElement] Stripe loaded:", !!stripe);
+        return stripe;
+      })
+      .catch((err) => {
+        console.error("[StripePaymentElement] Failed to load Stripe:", err);
+        setLoadError("Failed to load payment system");
+        return null;
+      });
+  }, [publishableKey]);
 
   useEffect(() => {
+    console.log("[StripePaymentElement] Initializing with:", {
+      hasClientSecret: !!clientSecret,
+      hasPublishableKey: !!publishableKey,
+      amount,
+    });
     setReady(true);
-  }, []);
+  }, [clientSecret, publishableKey, amount]);
+
+  if (loadError) {
+    return (
+      <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+        <div className="flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 text-destructive" />
+          <p className="text-sm text-destructive">{loadError}</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!ready) {
     return (
       <div className="flex items-center justify-center min-h-[320px]">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!clientSecret) {
+    console.error("[StripePaymentElement] Missing client secret");
+    return (
+      <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+        <div className="flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 text-destructive" />
+          <p className="text-sm text-destructive">
+            Payment session not initialized. Please try again.
+          </p>
+        </div>
       </div>
     );
   }

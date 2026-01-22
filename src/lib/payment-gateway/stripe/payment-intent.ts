@@ -1,7 +1,7 @@
-import Stripe from 'stripe';
-import { prisma } from '@/lib/db';
-import type { StripeCredentials } from './client';
-import { initializeStripe } from './client';
+import Stripe from "stripe";
+import { prisma } from "@/lib/db";
+import type { StripeCredentials } from "./client";
+import { initializeStripe } from "./client";
 
 export interface PaymentIntentParams {
   organizationId: string;
@@ -20,15 +20,18 @@ export interface PaymentIntentResult {
 
 export async function createPaymentIntent(
   credentials: StripeCredentials,
-  params: PaymentIntentParams
+  params: PaymentIntentParams,
 ): Promise<PaymentIntentResult> {
   try {
     if (params.amount <= 0) {
-      return { success: false, error: 'Payment amount must be greater than zero' };
+      return {
+        success: false,
+        error: "Payment amount must be greater than zero",
+      };
     }
 
     if (params.documentIds.length === 0) {
-      return { success: false, error: 'At least one document is required' };
+      return { success: false, error: "At least one document is required" };
     }
 
     const customer = await prisma.customer.findFirst({
@@ -39,7 +42,7 @@ export async function createPaymentIntent(
     });
 
     if (!customer) {
-      return { success: false, error: 'Customer not found' };
+      return { success: false, error: "Customer not found" };
     }
 
     const documents = await prisma.arDocument.findMany({
@@ -51,10 +54,13 @@ export async function createPaymentIntent(
     });
 
     if (documents.length !== params.documentIds.length) {
-      return { success: false, error: 'One or more documents not found' };
+      return { success: false, error: "One or more documents not found" };
     }
 
-    const totalBalanceDue = documents.reduce((sum, doc) => sum + doc.balanceDue, 0);
+    const totalBalanceDue = documents.reduce(
+      (sum, doc) => sum + doc.balanceDue,
+      0,
+    );
     if (params.amount > totalBalanceDue) {
       return {
         success: false,
@@ -62,13 +68,15 @@ export async function createPaymentIntent(
       };
     }
 
-    const documentNumbers = documents.map((doc) => doc.documentNumber).join(', ');
-    const description = `Payment for ${documents.length > 1 ? 'invoices' : 'invoice'} ${documentNumbers}`;
+    const documentNumbers = documents
+      .map((doc) => doc.documentNumber)
+      .join(", ");
+    const description = `Payment for ${documents.length > 1 ? "invoices" : "invoice"} ${documentNumbers}`;
 
     const paymentCount = await prisma.customerPayment.count({
       where: { organizationId: params.organizationId },
     });
-    const paymentNumber = `PMT-${String(paymentCount + 1).padStart(6, '0')}`;
+    const paymentNumber = `PMT-${String(paymentCount + 1).padStart(6, "0")}`;
 
     const payment = await prisma.customerPayment.create({
       data: {
@@ -77,20 +85,31 @@ export async function createPaymentIntent(
         paymentNumber,
         paymentDate: new Date(),
         amount: params.amount,
-        paymentMethod: 'CREDIT_CARD',
-        status: 'PENDING',
-        sourceType: 'MANUAL',
-        paymentGatewayProvider: 'STRIPE',
+        paymentMethod: "CREDIT_CARD",
+        status: "PENDING",
+        sourceType: "MANUAL",
+        paymentGatewayProvider: "STRIPE",
       },
     });
 
     const stripe = initializeStripe(credentials);
 
+    console.log("[PaymentIntent] Creating PaymentIntent:", {
+      amount: params.amount,
+      customerId: params.customerId,
+      documentIds: params.documentIds,
+      paymentNumber,
+    });
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(params.amount * 100),
-      currency: 'usd',
-      payment_method_types: ['card'], // Explicitly specify card payments
-      confirm: false, // Let frontend confirm
+      currency: "usd",
+      // Use automatic_payment_methods instead of payment_method_types for Payment Element
+      automatic_payment_methods: {
+        enabled: true,
+        allow_redirects: "never", // Prevent redirects, keep user on page
+      },
+      // Do NOT set confirm: true - let the frontend confirm with elements.submit() + confirmPayment()
       description,
       receipt_email: customer.email || undefined,
       metadata: {
@@ -98,8 +117,14 @@ export async function createPaymentIntent(
         customerId: params.customerId,
         paymentId: payment.id,
         paymentNumber,
-        documentIds: params.documentIds.join(','),
+        documentIds: params.documentIds.join(","),
       },
+    });
+
+    console.log("[PaymentIntent] Created successfully:", {
+      id: paymentIntent.id,
+      status: paymentIntent.status,
+      amount: paymentIntent.amount,
     });
 
     await prisma.customerPayment.update({
@@ -118,32 +143,35 @@ export async function createPaymentIntent(
       paymentId: payment.id,
     };
   } catch (error) {
-    console.error('Error creating payment intent:', error);
+    console.error("Error creating payment intent:", error);
 
     if (error instanceof Stripe.errors.StripeError) {
       return {
         success: false,
-        error: error.message || 'Stripe error occurred',
+        error: error.message || "Stripe error occurred",
       };
     }
 
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to create payment intent',
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to create payment intent",
     };
   }
 }
 
 export async function retrievePaymentIntent(
   credentials: StripeCredentials,
-  paymentIntentId: string
+  paymentIntentId: string,
 ): Promise<Stripe.PaymentIntent | null> {
   try {
     const stripe = initializeStripe(credentials);
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
     return paymentIntent;
   } catch (error) {
-    console.error('Error retrieving payment intent:', error);
+    console.error("Error retrieving payment intent:", error);
     return null;
   }
 }
