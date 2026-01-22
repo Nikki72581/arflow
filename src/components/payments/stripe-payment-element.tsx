@@ -153,6 +153,9 @@ function StripePaymentElementForm({
 
         // Add a small delay so logs are visible
         await new Promise((resolve) => setTimeout(resolve, 500));
+        console.log(
+          "[Stripe Payment] Calling onSuccess callback - dialog will close",
+        );
         onSuccess?.();
       } else if (result.paymentIntent?.status === "requires_payment_method") {
         console.error(
