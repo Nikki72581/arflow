@@ -36,6 +36,12 @@ export async function discoverPaymentMethods(
       throw new Error("Integration not found");
     }
 
+    // Only discover payment methods for entities that support it
+    if (integration.dataSourceEntity === "SalesInvoice") {
+      console.log("[Payment Methods] Skipping discovery for SalesInvoice (PaymentMethod field not available)");
+      return [];
+    }
+
     client = await createAuthenticatedClient(integration);
 
     // Fetch payment methods from Acumatica
@@ -106,20 +112,25 @@ export async function savePaymentMethodFilter(
     // Get current filter config
     const currentFilterConfig = (integration.filterConfig as any) || {};
 
-    // Use PaymentMethod field - available at top level for both SalesOrder and SalesInvoice
-    // Note: For SalesInvoice, the PaymentMethod field is directly on the entity
-    // Filtering on nested paths like FinancialDetails/PaymentMethod doesn't work in Acumatica OData
-    const paymentMethodField = "PaymentMethod";
+    // Get entity type from integration
+    const dataSourceEntity = integration.dataSourceEntity;
 
-    // Update filter config with payment method settings
-    const updatedFilterConfig = {
-      ...currentFilterConfig,
-      paymentMethod: {
-        field: paymentMethodField,
+    // Only configure payment method filter for entities that support it
+    // SalesOrder has PaymentMethod field, SalesInvoice does not
+    let paymentMethodConfig = null;
+    if (dataSourceEntity === "SalesOrder") {
+      paymentMethodConfig = {
+        field: "PaymentMethod",
         mode: mode,
         selectedValues:
           mode === "SELECTED" ? selectedPaymentMethods : undefined,
-      },
+      };
+    }
+
+    // Update filter config with payment method settings (only for supported entities)
+    const updatedFilterConfig = {
+      ...currentFilterConfig,
+      paymentMethod: paymentMethodConfig,
     };
 
     await prisma.acumaticaIntegration.update({
@@ -158,6 +169,12 @@ export async function getPaymentMethodFilter(
     }
 
     const filterConfig = integration.filterConfig as any;
+    const dataSourceEntity = integration.dataSourceEntity;
+
+    // For SalesInvoice, payment method filter is not supported
+    if (dataSourceEntity === "SalesInvoice") {
+      return null;
+    }
 
     if (!filterConfig?.paymentMethod) {
       return { mode: "ALL", selectedValues: [] };
