@@ -74,9 +74,7 @@ export async function checkPaymentSyncEligibility(
 
     const hasIntegration = !!integration;
     const integrationActive = integration?.status === "ACTIVE";
-    const paymentConfigured = !!(
-      integration?.defaultPaymentMethod && integration?.defaultCashAccount
-    );
+    const paymentConfigured = !!integration?.defaultPaymentMethod;
     const customerHasExternalId = !!payment.customer.externalId;
 
     // Check documents for external IDs
@@ -115,8 +113,7 @@ export async function checkPaymentSyncEligibility(
     if (!paymentConfigured) {
       return {
         eligible: false,
-        reason:
-          "Payment method and cash account not configured in Acumatica settings",
+        reason: "Payment method not configured in Acumatica settings",
         details,
       };
     }
@@ -205,9 +202,9 @@ export async function syncPaymentToAcumatica(
     }
 
     // 4. Check if payment configuration is set
-    if (!integration.defaultCashAccount || !integration.defaultPaymentMethod) {
+    if (!integration.defaultPaymentMethod) {
       throw new Error(
-        "Acumatica payment configuration is incomplete. Please set default cash account and payment method in integration settings.",
+        "Acumatica payment configuration is incomplete. Please set a default payment method in integration settings.",
       );
     }
 
@@ -246,11 +243,12 @@ export async function syncPaymentToAcumatica(
 
     try {
       // 8. Build payment request
+      // Note: cashAccount is not specified - Acumatica will use the default cash account
+      // associated with the payment method
       const paymentRequest: CreatePaymentRequest = {
         type: "Payment",
         customerId: payment.customer.externalId,
         paymentMethod: integration.defaultPaymentMethod,
-        cashAccount: integration.defaultCashAccount,
         paymentAmount: payment.amount,
         paymentRef: payment.paymentNumber,
         applicationDate: payment.paymentDate,

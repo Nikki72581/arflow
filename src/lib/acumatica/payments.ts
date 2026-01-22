@@ -29,7 +29,7 @@ function wrapValue<T>(value: T): AcumaticaValue<T> {
  *   type: 'Payment',
  *   customerId: 'CUST001',
  *   paymentMethod: 'CHECK',
- *   cashAccount: '10200',
+ *   // cashAccount is optional - Acumatica uses the default for the payment method if not specified
  *   paymentAmount: 500.00,
  *   paymentRef: 'CHK-12345',
  *   documentsToApply: [
@@ -54,9 +54,14 @@ export async function createPayment(
     Type: wrapValue(request.type),
     CustomerID: wrapValue(request.customerId),
     PaymentMethod: wrapValue(request.paymentMethod),
-    CashAccount: wrapValue(request.cashAccount),
     PaymentAmount: wrapValue(request.paymentAmount),
   };
+
+  // Only include CashAccount if explicitly provided
+  // If not provided, Acumatica will use the default cash account for the payment method
+  if (request.cashAccount) {
+    paymentBody.CashAccount = wrapValue(request.cashAccount);
+  }
 
   // Add optional fields
   if (request.paymentRef) {

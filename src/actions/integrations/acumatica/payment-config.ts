@@ -377,7 +377,6 @@ export async function savePaymentConfiguration(
   integrationId: string,
   config: {
     defaultPaymentMethod: string;
-    defaultCashAccount: string;
     autoSyncPayments?: boolean;
   },
 ): Promise<{ success: boolean; error?: string }> {
@@ -396,10 +395,10 @@ export async function savePaymentConfiguration(
     }
 
     // Validate required fields
-    if (!config.defaultPaymentMethod || !config.defaultCashAccount) {
+    if (!config.defaultPaymentMethod) {
       return {
         success: false,
-        error: "Both payment method and cash account are required",
+        error: "Payment method is required",
       };
     }
 
@@ -407,7 +406,8 @@ export async function savePaymentConfiguration(
       where: { id: integrationId },
       data: {
         defaultPaymentMethod: config.defaultPaymentMethod,
-        defaultCashAccount: config.defaultCashAccount,
+        // Clear defaultCashAccount since we're now letting Acumatica use its default
+        defaultCashAccount: null,
         autoSyncPayments: config.autoSyncPayments ?? false,
       },
     });

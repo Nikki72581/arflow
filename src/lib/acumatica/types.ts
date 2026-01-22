@@ -206,7 +206,7 @@ export interface CreatePaymentRequest {
   type: string;
   customerId: string;
   paymentMethod: string;
-  cashAccount: string;
+  cashAccount?: string; // Optional - Acumatica will use the default cash account for the payment method if not specified
   paymentAmount: number;
   paymentRef?: string;
   applicationDate?: Date;
