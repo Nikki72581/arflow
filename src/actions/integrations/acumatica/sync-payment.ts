@@ -250,11 +250,13 @@ export async function syncPaymentToAcumatica(
           );
 
           // Try to fetch the invoice from Acumatica to ensure it exists
-          // For Invoice type, we check the Invoice endpoint
-          const endpoint = `Invoice/${doc.externalId}`;
+          // Use OData filter to query by ReferenceNbr instead of direct ID lookup
+          // This is more reliable as the URL path might expect internal ID, not reference number
+          const endpoint = `Invoice`;
+          const filter = `ReferenceNbr eq '${doc.externalId}'`;
           const validateResponse = await client.makeRequest(
             "GET",
-            endpoint + "?$select=ReferenceNbr,Type,Status,Balance,BranchID",
+            `${endpoint}?$filter=${encodeURIComponent(filter)}&$select=ReferenceNbr,Type,Status,Balance,BranchID&$top=1`,
           );
 
           if (!validateResponse.ok) {
@@ -268,7 +270,21 @@ export async function syncPaymentToAcumatica(
             continue;
           }
 
-          const invoiceData = await validateResponse.json();
+          const responseData = await validateResponse.json();
+          const invoices = responseData.value || responseData;
+
+          // Check if any invoices were found
+          if (!Array.isArray(invoices) || invoices.length === 0) {
+            console.error(
+              `[Sync Payment] Document ${doc.externalId} not found in query results`,
+            );
+            invalidDocuments.push(
+              `${doc.documentNumber} (${doc.externalId}) - not found in Acumatica`,
+            );
+            continue;
+          }
+
+          const invoiceData = invoices[0];
           const refNbr = invoiceData.ReferenceNbr?.value;
           const type = invoiceData.Type?.value;
           const status = invoiceData.Status?.value;
