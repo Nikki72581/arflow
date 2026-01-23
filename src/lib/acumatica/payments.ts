@@ -199,19 +199,20 @@ export async function releasePayment(
 }
 
 /**
- * Map ARFlow document type to Acumatica document type
+ * Map ARFlow document type to Acumatica document type code
+ * Acumatica API expects abbreviated codes, not full names
  */
 export function mapDocumentType(
   arflowType: string,
-): "Invoice" | "Credit Memo" | "Debit Memo" {
+): "INV" | "CRM" | "DRM" {
   switch (arflowType.toUpperCase()) {
     case "INVOICE":
-      return "Invoice";
+      return "INV";
     case "CREDIT_MEMO":
-      return "Credit Memo";
+      return "CRM";
     case "DEBIT_MEMO":
-      return "Debit Memo";
+      return "DRM";
     default:
-      return "Invoice"; // Default to invoice
+      return "INV"; // Default to invoice
   }
 }

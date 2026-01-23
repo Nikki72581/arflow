@@ -221,9 +221,10 @@ export interface CreatePaymentRequest {
 
 /**
  * Payment application input (not wrapped in AcumaticaValue)
+ * Note: Acumatica API expects abbreviated document type codes
  */
 export interface PaymentApplicationInput {
-  docType: "Invoice" | "Credit Memo" | "Debit Memo";
+  docType: "INV" | "CRM" | "DRM";
   referenceNbr: string;
   amountPaid: number;
   docLineNbr?: number;
