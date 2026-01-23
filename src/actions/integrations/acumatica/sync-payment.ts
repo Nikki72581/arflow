@@ -314,10 +314,45 @@ export async function syncPaymentToAcumatica(
       // 7. Build payment request
       // Note: cashAccount is not specified - Acumatica will use the default cash account
       // associated with the payment method
+
+      // Determine the branch from the documents being applied
+      // In multi-branch orgs, the payment must be in the same branch as the documents
+      let branchId: string | undefined = undefined;
+
+      if (payment.paymentApplications.length > 0) {
+        // Get unique branches from all documents
+        const branches = new Set(
+          payment.paymentApplications
+            .map((app) => app.arDocument.externalBranch)
+            .filter((branch): branch is string => !!branch),
+        );
+
+        if (branches.size === 1) {
+          // All documents are in the same branch - use it
+          branchId = Array.from(branches)[0];
+          console.log(`[Sync Payment] Using branch ${branchId} from documents`);
+        } else if (branches.size > 1) {
+          // Documents are in multiple branches - this is a problem
+          console.warn(
+            `[Sync Payment] Documents span multiple branches: ${Array.from(branches).join(", ")}`,
+          );
+          // Use the first branch as a fallback, but this may cause issues
+          branchId = Array.from(branches)[0];
+          console.log(
+            `[Sync Payment] Using first branch ${branchId} as fallback`,
+          );
+        } else {
+          console.log(
+            "[Sync Payment] No branch information found on documents",
+          );
+        }
+      }
+
       const paymentRequest: CreatePaymentRequest = {
         type: "Payment",
         customerId: payment.customer.externalId,
         paymentMethod: integration.defaultPaymentMethod,
+        branchId: branchId, // Include branch if available
         paymentAmount: payment.amount,
         paymentRef: payment.paymentNumber,
         applicationDate: payment.paymentDate,
@@ -328,6 +363,7 @@ export async function syncPaymentToAcumatica(
 
       console.log("[Sync Payment] Creating payment in Acumatica:", {
         customerId: paymentRequest.customerId,
+        branchId: paymentRequest.branchId || "(not specified)",
         amount: paymentRequest.paymentAmount,
         documentsCount: documentsToApply.length,
       });

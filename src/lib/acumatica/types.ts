@@ -171,6 +171,7 @@ export interface AcumaticaPayment {
   PaymentAmount: AcumaticaValue<number>;
   PaymentMethod: AcumaticaValue<string>;
   CashAccount: AcumaticaValue<string>;
+  BranchID?: AcumaticaValue<string>;
   PaymentRef?: AcumaticaValue<string>;
   ApplicationDate?: AcumaticaValue<string>;
   CurrencyID?: AcumaticaValue<string>;
@@ -207,6 +208,7 @@ export interface CreatePaymentRequest {
   customerId: string;
   paymentMethod: string;
   cashAccount?: string; // Optional - Acumatica will use the default cash account for the payment method if not specified
+  branchId?: string; // Optional - Branch ID, important for multi-branch organizations as it affects document visibility
   paymentAmount: number;
   paymentRef?: string;
   applicationDate?: Date;

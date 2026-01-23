@@ -63,6 +63,12 @@ export async function createPayment(
     paymentBody.CashAccount = wrapValue(request.cashAccount);
   }
 
+  // Include BranchID if provided
+  // This is important for multi-branch organizations as it affects which documents are visible for application
+  if (request.branchId) {
+    paymentBody.BranchID = wrapValue(request.branchId);
+  }
+
   // Add optional fields
   if (request.paymentRef) {
     paymentBody.PaymentRef = wrapValue(request.paymentRef);
