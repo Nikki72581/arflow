@@ -643,7 +643,8 @@ export class AcumaticaClient {
       const cleanEndpoint = endpoint.startsWith("/")
         ? endpoint.slice(1)
         : endpoint;
-      url = `${this.instanceUrl}/${cleanEndpoint}`;
+      // Use baseUrl (which includes /entity/Default/{version}/) for entity endpoints
+      url = `${this.baseUrl}/${cleanEndpoint}`;
     }
 
     console.log(`[Acumatica Client] makeRequest: ${method} ${url}`);
