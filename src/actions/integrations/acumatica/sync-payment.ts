@@ -230,19 +230,88 @@ export async function syncPaymentToAcumatica(
       );
     }
 
-    const documentsToApply = payment.paymentApplications.map((app) => {
-      return {
-        docType: mapDocumentType(app.arDocument.documentType),
-        referenceNbr: app.arDocument.externalId as string,
-        amountPaid: app.amountApplied,
-      };
-    });
-
-    // 7. Create authenticated Acumatica client
+    // 6a. Create authenticated Acumatica client early to validate documents
     const client = await createAuthenticatedClient(integration);
 
     try {
-      // 8. Build payment request
+      // 6b. Validate each document exists in Acumatica and is eligible for payment application
+      const documentsToValidate = payment.paymentApplications.map((app) => ({
+        externalId: app.arDocument.externalId as string,
+        docType: mapDocumentType(app.arDocument.documentType),
+        documentNumber: app.arDocument.documentNumber,
+      }));
+
+      const invalidDocuments: string[] = [];
+
+      for (const doc of documentsToValidate) {
+        try {
+          console.log(
+            `[Sync Payment] Validating document ${doc.externalId} exists in Acumatica...`,
+          );
+
+          // Try to fetch the invoice from Acumatica to ensure it exists
+          // For Invoice type, we check the Invoice endpoint
+          const endpoint = `Invoice/${doc.externalId}`;
+          const validateResponse = await client.makeRequest(
+            "GET",
+            endpoint + "?$select=ReferenceNbr,Status,Balance",
+          );
+
+          if (!validateResponse.ok) {
+            console.error(
+              `[Sync Payment] Document ${doc.externalId} validation failed:`,
+              validateResponse.status,
+            );
+            invalidDocuments.push(
+              `${doc.documentNumber} (${doc.externalId}) - not found in Acumatica`,
+            );
+            continue;
+          }
+
+          const invoiceData = await validateResponse.json();
+          const status = invoiceData.Status?.value;
+          const balance = invoiceData.Balance?.value || 0;
+
+          console.log(
+            `[Sync Payment] Document ${doc.externalId} status: ${status}, balance: ${balance}`,
+          );
+
+          // Check if the document is in a state that allows payment application
+          if (status === "Balanced" || status === "Closed") {
+            invalidDocuments.push(
+              `${doc.documentNumber} (${doc.externalId}) - status is ${status}, cannot apply payment`,
+            );
+          } else if (balance <= 0) {
+            invalidDocuments.push(
+              `${doc.documentNumber} (${doc.externalId}) - has zero balance`,
+            );
+          }
+        } catch (docError) {
+          console.error(
+            `[Sync Payment] Error validating document ${doc.externalId}:`,
+            docError,
+          );
+          invalidDocuments.push(
+            `${doc.documentNumber} (${doc.externalId}) - validation error: ${docError instanceof Error ? docError.message : "Unknown error"}`,
+          );
+        }
+      }
+
+      if (invalidDocuments.length > 0) {
+        throw new Error(
+          `Cannot sync payment: ${invalidDocuments.length} document(s) are not eligible for payment in Acumatica:\n${invalidDocuments.join("\n")}`,
+        );
+      }
+
+      const documentsToApply = payment.paymentApplications.map((app) => {
+        return {
+          docType: mapDocumentType(app.arDocument.documentType),
+          referenceNbr: app.arDocument.externalId as string,
+          amountPaid: app.amountApplied,
+        };
+      });
+
+      // 7. Build payment request
       // Note: cashAccount is not specified - Acumatica will use the default cash account
       // associated with the payment method
       const paymentRequest: CreatePaymentRequest = {
@@ -263,7 +332,7 @@ export async function syncPaymentToAcumatica(
         documentsCount: documentsToApply.length,
       });
 
-      // 9. Create payment in Acumatica
+      // 8. Create payment in Acumatica
       const acumaticaPayment = await createPayment(client, paymentRequest);
 
       console.log("[Sync Payment] Payment created in Acumatica:", {
@@ -271,7 +340,7 @@ export async function syncPaymentToAcumatica(
         status: acumaticaPayment.Status.value,
       });
 
-      // 10. Update payment record with sync status
+      // 9. Update payment record with sync status
       await prisma.customerPayment.update({
         where: { id: paymentId },
         data: {
@@ -282,7 +351,7 @@ export async function syncPaymentToAcumatica(
         },
       });
 
-      // 11. Log successful sync
+      // 10. Log successful sync
       await prisma.integrationSyncLog.create({
         data: {
           integrationId: integration.id,

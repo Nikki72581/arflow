@@ -9,7 +9,10 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { UserRole } from "@prisma/client";
-import { FilterConfig, isValidFilterConfig } from "@/lib/acumatica/config-types";
+import {
+  FilterConfig,
+  isValidFilterConfig,
+} from "@/lib/acumatica/config-types";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -17,7 +20,7 @@ import { revalidatePath } from "next/cache";
  */
 export async function saveFilterConfig(
   integrationId: string,
-  filterConfig: FilterConfig
+  filterConfig: FilterConfig,
 ): Promise<void> {
   const user = await getCurrentUser();
   if (!user || user.role !== UserRole.ADMIN) {
@@ -55,7 +58,9 @@ export async function saveFilterConfig(
 /**
  * Get current filter configuration
  */
-export async function getFilterConfig(integrationId: string): Promise<FilterConfig | null> {
+export async function getFilterConfig(
+  integrationId: string,
+): Promise<FilterConfig | null> {
   const user = await getCurrentUser();
   if (!user || user.role !== UserRole.ADMIN) {
     throw new Error("Only administrators can view filter configuration");
@@ -83,7 +88,7 @@ export async function getDefaultFilterConfig(): Promise<FilterConfig> {
   return {
     status: {
       field: "Status",
-      allowedValues: ["Open", "Closed"],
+      allowedValues: ["Open"], // Only import Open status documents
     },
     documentType: {
       field: "Type",
@@ -92,6 +97,11 @@ export async function getDefaultFilterConfig(): Promise<FilterConfig> {
     dateRange: {
       field: "Date",
       startDate: new Date(new Date().getFullYear(), 0, 1).toISOString(), // Start of current year
+    },
+    balanceFilter: {
+      field: "Balance",
+      operator: "gt", // Greater than
+      value: 0, // Only import documents with a balance > 0
     },
   };
 }
@@ -126,8 +136,9 @@ export async function getFilterOptions(integrationId: string): Promise<{
   const schema = integration.discoveredSchema as any;
 
   // Default values for REST API Invoice entity
+  // Note: "Balanced" status means fully paid, so we typically only want "Open" for AR collections
   const defaults = {
-    statusValues: ["Hold", "Balanced", "Open", "Closed", "Voided"],
+    statusValues: ["Open", "Hold", "Balanced", "Closed", "Voided"],
     documentTypes: ["Invoice", "Credit Memo", "Debit Memo", "Prepayment"],
     dateFields: ["Date", "DocDate", "DueDate"],
     branchFields: ["BranchID"],
@@ -152,7 +163,8 @@ export async function getFilterOptions(integrationId: string): Promise<{
     statusValues: defaults.statusValues, // Would need to query Acumatica for actual values
     documentTypes: defaults.documentTypes, // Would need to query Acumatica for actual values
     dateFields: dateFields.length > 0 ? dateFields : defaults.dateFields,
-    branchFields: branchFields.length > 0 ? branchFields : defaults.branchFields,
+    branchFields:
+      branchFields.length > 0 ? branchFields : defaults.branchFields,
   };
 }
 
@@ -160,7 +172,7 @@ export async function getFilterOptions(integrationId: string): Promise<{
  * Validate filter configuration
  */
 export async function validateFilterConfig(
-  filterConfig: FilterConfig
+  filterConfig: FilterConfig,
 ): Promise<{ valid: boolean; errors: string[] }> {
   const errors: string[] = [];
 
@@ -169,7 +181,10 @@ export async function validateFilterConfig(
     errors.push("Status filter field is required");
   }
 
-  if (!filterConfig.status?.allowedValues || filterConfig.status.allowedValues.length === 0) {
+  if (
+    !filterConfig.status?.allowedValues ||
+    filterConfig.status.allowedValues.length === 0
+  ) {
     errors.push("At least one status value must be allowed");
   }
 
