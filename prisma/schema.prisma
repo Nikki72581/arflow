@@ -540,6 +540,7 @@ model PaymentApplication {
   payment      CustomerPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   arDocument   ArDocument      @relation(fields: [arDocumentId], references: [id], onDelete: Cascade)
 
+  @@unique([paymentId, arDocumentId])
   @@index([paymentId])
   @@index([arDocumentId])
   @@index([organizationId])

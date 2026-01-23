@@ -58,12 +58,15 @@ export async function handleCheckoutSessionCompleted(
       throw new Error("No valid document IDs found in metadata");
     }
 
+    // Track whether we successfully processed this payment
+    let paymentProcessed = false;
+
     // Use a transaction to ensure all updates are atomic
     await prisma.$transaction(async (tx) => {
-      // Update payment record to APPLIED status
-      // Note: Card details (last4, brand) are set during checkout session creation
-      await tx.customerPayment.update({
-        where: { id: payment.id },
+      // Atomic status update - only proceed if status is still PENDING
+      // This prevents race conditions when webhook and verify-immediate run simultaneously
+      const updateResult = await tx.customerPayment.updateMany({
+        where: { id: payment.id, status: "PENDING" },
         data: {
           status: "APPLIED",
           checkoutSessionStatus: "complete",
@@ -71,6 +74,14 @@ export async function handleCheckoutSessionCompleted(
           gatewayResponse: JSON.parse(JSON.stringify(session)),
         },
       });
+
+      // If no rows updated, another process already handled this payment
+      if (updateResult.count === 0) {
+        console.log("Payment already being processed by another request:", payment.id);
+        return;
+      }
+
+      paymentProcessed = true;
 
       // Apply payment to documents
       let remainingAmount = payment.amount;
@@ -128,6 +139,12 @@ export async function handleCheckoutSessionCompleted(
         remainingAmount -= amountToApply;
       }
     });
+
+    // Only sync if we actually processed the payment (won the race)
+    if (!paymentProcessed) {
+      console.log("Skipping Acumatica sync - payment handled by another process:", payment.id);
+      return;
+    }
 
     console.log("Checkout session completed successfully:", sessionId);
 
@@ -289,9 +306,14 @@ export async function handlePaymentIntentSucceeded(
       throw new Error("No valid document IDs found in metadata");
     }
 
+    // Track whether we successfully processed this payment
+    let paymentProcessed = false;
+
     await prisma.$transaction(async (tx) => {
-      await tx.customerPayment.update({
-        where: { id: payment.id },
+      // Atomic status update - only proceed if status is still PENDING
+      // This prevents race conditions when webhook and verify-immediate run simultaneously
+      const updateResult = await tx.customerPayment.updateMany({
+        where: { id: payment.id, status: "PENDING" },
         data: {
           status: "APPLIED",
           checkoutSessionStatus: paymentIntent.status,
@@ -299,6 +321,14 @@ export async function handlePaymentIntentSucceeded(
           gatewayResponse: JSON.parse(JSON.stringify(paymentIntent)),
         },
       });
+
+      // If no rows updated, another process already handled this payment
+      if (updateResult.count === 0) {
+        console.log("Payment already being processed by another request:", payment.id);
+        return;
+      }
+
+      paymentProcessed = true;
 
       let remainingAmount = payment.amount;
 
@@ -352,6 +382,12 @@ export async function handlePaymentIntentSucceeded(
         remainingAmount -= amountToApply;
       }
     });
+
+    // Only sync if we actually processed the payment (won the race)
+    if (!paymentProcessed) {
+      console.log("Skipping Acumatica sync - payment handled by another process:", payment.id);
+      return;
+    }
 
     console.log("Payment intent succeeded:", paymentIntentId);
 
