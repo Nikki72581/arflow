@@ -137,6 +137,12 @@ export async function createPayment(
     ordersCount: request.ordersToApply?.length || 0,
   });
 
+  // Log the full payment body for debugging
+  console.log(
+    "[Acumatica Payments] Payment body:",
+    JSON.stringify(paymentBody, null, 2),
+  );
+
   // Make the PUT request to create the payment
   // Use the private put method from AcumaticaClient
   const createdPayment = (await (client as any).put(

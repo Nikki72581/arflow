@@ -254,7 +254,7 @@ export async function syncPaymentToAcumatica(
           const endpoint = `Invoice/${doc.externalId}`;
           const validateResponse = await client.makeRequest(
             "GET",
-            endpoint + "?$select=ReferenceNbr,Status,Balance",
+            endpoint + "?$select=ReferenceNbr,Type,Status,Balance,BranchID",
           );
 
           if (!validateResponse.ok) {
@@ -269,11 +269,14 @@ export async function syncPaymentToAcumatica(
           }
 
           const invoiceData = await validateResponse.json();
+          const refNbr = invoiceData.ReferenceNbr?.value;
+          const type = invoiceData.Type?.value;
           const status = invoiceData.Status?.value;
           const balance = invoiceData.Balance?.value || 0;
+          const docBranch = invoiceData.BranchID?.value;
 
           console.log(
-            `[Sync Payment] Document ${doc.externalId} status: ${status}, balance: ${balance}`,
+            `[Sync Payment] Document ${doc.externalId} validated - RefNbr: ${refNbr}, Type: ${type}, Status: ${status}, Balance: ${balance}, Branch: ${docBranch || "(none)"}`,
           );
 
           // Check if the document is in a state that allows payment application
@@ -310,6 +313,11 @@ export async function syncPaymentToAcumatica(
           amountPaid: app.amountApplied,
         };
       });
+
+      console.log(
+        "[Sync Payment] Documents to apply:",
+        JSON.stringify(documentsToApply, null, 2),
+      );
 
       // 7. Build payment request
       // Note: cashAccount is not specified - Acumatica will use the default cash account
